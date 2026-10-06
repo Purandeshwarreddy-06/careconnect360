@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+@theme {
+  --color-nightcare-bg: #030712;
+  --color-nightcare-bg-alt: #050816;
+  --color-nightcare-deep: #08111F;
+  
+  --color-nightcare-surface: #0B1220;
+  --color-nightcare-surface-card: #101827;
+  --color-nightcare-surface-hover: #111C2E;
+  --color-nightcare-border: #1E293B;
+  --color-nightcare-border-light: rgba(255, 255, 255, 0.08);
+
+  --color-nightcare-primary: #2563EB;
+  --color-nightcare-primary-light: #3B82F6;
+  
+  --color-nightcare-cyan: #06B6D4;
+  --color-nightcare-cyan-light: #22D3EE;
+
+  --color-nightcare-purple: #8B5CF6;
+  --color-nightcare-purple-light: #A855F7;
+
+  --color-nightcare-healthy: #22C55E;
+  --color-nightcare-warning: #F59E0B;
+  --color-nightcare-emergency: #EF4444;
+
+  --color-nightcare-text: #F8FAFC;
+  --color-nightcare-muted: #94A3B8;
+  --color-nightcare-subtle: #64748B;
+}
+
+:root {
+  color-scheme: dark;
+  --font-fallback: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #030712;
+  color: #F8FAFC;
+  font-family: 'Inter', var(--font-fallback);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Glassmorphism utility classes */
+.glass-panel {
+  background: rgba(11, 18, 32, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-panel-elevated {
+  background: rgba(16, 24, 39, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6);
+}
+
+.glass-glow-cyan {
+  box-shadow: 0 0 25px -5px rgba(6, 182, 212, 0.25);
+}
+
+.glass-glow-blue {
+  box-shadow: 0 0 25px -5px rgba(37, 99, 235, 0.25);
+}
+
+.glass-glow-emergency {
+  box-shadow: 0 0 30px -5px rgba(239, 68, 68, 0.45);
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #030712;
+}
+::-webkit-scrollbar-thumb {
+  background: #1E293B;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+/* Pulse animation for live indicators */
+@keyframes pulse-live {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.15);
+  }
+}
+
+.animate-pulse-live {
+  animation: pulse-live 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
