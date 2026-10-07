@@ -16,7 +16,10 @@ import {
   CheckCircle2, 
   X,
   AlertTriangle,
-  Info
+  Info,
+  Ruler,
+  Gauge,
+  Wind
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -105,14 +108,23 @@ export const HealthPage: React.FC = () => {
       unit = '%';
       defaultVal = 98;
     } else if (p === 'temperature') {
-      unit = '°F';
-      defaultVal = 98.4;
+      unit = '°C';
+      defaultVal = 36.8;
     } else if (p === 'blood_sugar') {
       unit = 'mg/dL';
-      defaultVal = 110;
+      defaultVal = 95;
     } else if (p === 'weight') {
       unit = 'kg';
-      defaultVal = 65;
+      defaultVal = 68;
+    } else if (p === 'height') {
+      unit = 'cm';
+      defaultVal = 170;
+    } else if (p === 'bmi') {
+      unit = 'kg/m²';
+      defaultVal = 23.5;
+    } else if (p === 'respiratory_rate') {
+      unit = '/min';
+      defaultVal = 16;
     }
 
     setFormData({
@@ -205,15 +217,23 @@ export const HealthPage: React.FC = () => {
       {/* HEADER & TOP BAR */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs font-bold uppercase tracking-wider mb-2">
-            <Activity className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Health & Vitals Telemetry</span>
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs font-bold uppercase tracking-wider">
+              <Activity className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Health & Vitals Telemetry</span>
+            </div>
+            {(!user || user.is_demo || user.full_name === 'Rahul Kumar') && (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/15 border border-blue-400/30 text-cyan-300 text-xs font-bold">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                <span>Demo Patient: Rahul Kumar (45, Male) • Sample Vitals</span>
+              </div>
+            )}
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
             Vital Readings & Trends
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-            Continuous health parameter tracking • Historical trends & caregiver observation
+            Continuous health parameter tracking • Sample Data / Hackathon Demo • Not a clinical diagnosis
           </p>
         </div>
 
@@ -227,15 +247,18 @@ export const HealthPage: React.FC = () => {
         </button>
       </div>
 
-      {/* PARAMETER SELECTOR CHIPS */}
+      {/* PARAMETER SELECTOR CHIPS - ALL 9 PARAMETERS */}
       <div className="flex flex-wrap gap-2.5">
         {[
           { key: 'blood_pressure', label: 'Blood Pressure', icon: Activity, unit: 'mmHg' },
           { key: 'heart_rate', label: 'Heart Rate', icon: Heart, unit: 'bpm' },
-          { key: 'blood_sugar', label: 'Blood Sugar', icon: Flame, unit: 'mg/dL' },
           { key: 'spo2', label: 'SpO₂ Oxygen', icon: Droplet, unit: '%' },
-          { key: 'temperature', label: 'Temperature', icon: Thermometer, unit: '°F' },
+          { key: 'temperature', label: 'Temperature', icon: Thermometer, unit: '°C' },
+          { key: 'blood_sugar', label: 'Blood Sugar', icon: Flame, unit: 'mg/dL' },
           { key: 'weight', label: 'Weight', icon: Scale, unit: 'kg' },
+          { key: 'height', label: 'Height', icon: Ruler, unit: 'cm' },
+          { key: 'bmi', label: 'BMI Index', icon: Gauge, unit: 'kg/m²' },
+          { key: 'respiratory_rate', label: 'Resp. Rate', icon: Wind, unit: '/min' },
         ].map((item) => {
           const Icon = item.icon;
           const isSelected = selectedParameter === item.key;
@@ -243,13 +266,13 @@ export const HealthPage: React.FC = () => {
             <button
               key={item.key}
               onClick={() => setSelectedParameter(item.key as HealthParameter)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                 isSelected
                   ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25 ring-2 ring-cyan-400/40'
                   : 'bg-[#0B1220] border border-white/[0.08] text-slate-300 hover:text-white hover:bg-slate-900'
               }`}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className="w-3.5 h-3.5" />
               <span>{item.label}</span>
             </button>
           );
@@ -478,8 +501,11 @@ export const HealthPage: React.FC = () => {
                   <option value="heart_rate">Heart Rate (bpm)</option>
                   <option value="blood_sugar">Blood Sugar (mg/dL)</option>
                   <option value="spo2">SpO₂ Oxygen Saturation (%)</option>
-                  <option value="temperature">Body Temperature (°F)</option>
+                  <option value="temperature">Body Temperature (°C)</option>
                   <option value="weight">Body Weight (kg)</option>
+                  <option value="height">Standing Height (cm)</option>
+                  <option value="bmi">Body Mass Index (kg/m²)</option>
+                  <option value="respiratory_rate">Respiratory Rate (/min)</option>
                 </select>
               </div>
 

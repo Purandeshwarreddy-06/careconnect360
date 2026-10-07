@@ -41,13 +41,13 @@ export const ConsultationPage: React.FC = () => {
   const [messages, setMessages] = useState<Array<{ sender: string; text: string; time: string; isDoctor: boolean }>>([
     {
       sender: 'Dr. Ananya Rao',
-      text: 'Good day! I have reviewed your latest blood pressure telemetry (128/82 mmHg). How are you feeling today?',
+      text: 'Good day! I have reviewed your latest blood pressure telemetry (120/80 mmHg). How are you feeling today?',
       time: '04:01 PM',
       isDoctor: true,
     },
     {
-      sender: 'Lakshmi Devi',
-      text: 'Good afternoon Doctor Rao. Feeling much better after taking morning Amlodipine regularly.',
+      sender: user?.full_name || 'Rahul Kumar',
+      text: 'Good afternoon Doctor Rao. Feeling active and following my scheduled medication doses on time.',
       time: '04:02 PM',
       isDoctor: false,
     },
@@ -61,7 +61,7 @@ export const ConsultationPage: React.FC = () => {
           const found = await getAppointmentById(id);
           if (found) setAppointment(found);
           else {
-            const list = await getAppointments(user?.id || 'usr-lakshmi-devi-01');
+            const list = await getAppointments(user?.id || 'usr-rahul-kumar-demo');
             setAppointment(list[0] || null);
           }
         }
@@ -79,7 +79,7 @@ export const ConsultationPage: React.FC = () => {
     if (!chatInput.trim()) return;
 
     const newMsg = {
-      sender: user?.full_name || 'Lakshmi Devi',
+      sender: user?.full_name || 'Rahul Kumar',
       text: chatInput.trim(),
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       isDoctor: false,
@@ -175,7 +175,7 @@ export const ConsultationPage: React.FC = () => {
                     className="w-full h-full object-cover"
                   />
                   <div className="absolute bottom-1 left-1.5 text-[9px] bg-black/70 px-1 rounded text-white font-medium">
-                    You ({user?.full_name?.split(' ')[0] || 'Lakshmi'})
+                    You ({user?.full_name?.split(' ')[0] || 'Rahul'})
                   </div>
                 </div>
               ) : (

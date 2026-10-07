@@ -156,9 +156,9 @@ export const LoginPage: React.FC = () => {
               >
                 <div className="flex items-center gap-1.5 text-cyan-400 text-xs font-bold">
                   <User className="w-3.5 h-3.5" />
-                  <span>Lakshmi Devi</span>
+                  <span>Rahul Kumar</span>
                 </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">Elderly User</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">Demo Patient (45, Male)</div>
               </button>
 
               <button

@@ -291,6 +291,20 @@ export const MedicinesPage: React.FC = () => {
         </div>
       </div>
 
+      {/* DEMO MEDICATION DISCLAIMER BANNER */}
+      <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/40 via-cyan-950/30 to-slate-900 border border-cyan-500/30 flex items-start gap-3 backdrop-blur-md">
+        <Sparkles className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
+        <div className="text-xs">
+          <div className="font-bold text-cyan-200 flex items-center gap-2">
+            <span>Demo Medication Data — Not a Prescription</span>
+            <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px]">Hackathon Sample Records</span>
+          </div>
+          <p className="text-slate-300 mt-1 leading-relaxed">
+            The medication entries below (Paracetamol, Cetirizine, ORS, Vitamin D3) are sample demo records for demonstration purposes only. They do not constitute real clinical recommendations or medical prescriptions.
+          </p>
+        </div>
+      </div>
+
       {/* TABS: PRESCRIPTIONS VS LOGS */}
       <div className="flex border-b border-white/[0.08] gap-6">
         <button
@@ -414,10 +428,25 @@ export const MedicinesPage: React.FC = () => {
 
                       {/* Main Med Info */}
                       <div className="mt-4">
-                        <h3 className="text-xl font-bold text-white tracking-tight">{med.name}</h3>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-xl font-bold text-white tracking-tight">{med.name}</h3>
+                          {med.purpose && (
+                            <span className="px-2 py-0.5 rounded-md bg-blue-500/15 border border-blue-500/30 text-cyan-300 text-[11px] font-medium">
+                              Purpose: {med.purpose}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-cyan-300 font-semibold mt-0.5">
                           {med.dosage} • {med.frequency}
                         </p>
+
+                        {(med.is_demo || !med.created_at) && (
+                          <div className="mt-2">
+                            <span className="inline-block px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px] font-semibold">
+                              Demo Medication Data — Not a Prescription
+                            </span>
+                          </div>
+                        )}
 
                         <div className={`mt-3 inline-flex items-center gap-2 px-2.5 py-1 rounded-lg text-xs ${
                           isDue ? 'bg-red-950/60 text-red-200 border border-red-500/40' : 'bg-slate-900/60 text-slate-300'

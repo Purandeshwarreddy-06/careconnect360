@@ -14,6 +14,7 @@ import {
   CaregiverActivity,
 } from '@/types';
 import {
+  DEMO_PATIENT,
   DEMO_ELDERLY_USER,
   DEMO_CAREGIVER_USER,
   getInitialMedicines,
@@ -61,15 +62,52 @@ export function ensureInitializedStore() {
   if (!localStorage.getItem(STORAGE_KEYS.PROFILES)) {
     localStorage.setItem(
       STORAGE_KEYS.PROFILES,
-      JSON.stringify([DEMO_ELDERLY_USER, DEMO_CAREGIVER_USER])
+      JSON.stringify([DEMO_PATIENT, DEMO_CAREGIVER_USER])
     );
+  } else {
+    // If profiles still contain legacy default unedited seed names, upgrade them to DEMO_PATIENT
+    try {
+      const existingProfiles: UserProfile[] = JSON.parse(
+        localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]'
+      );
+      let updated = false;
+      const upgraded = existingProfiles.map((p) => {
+        if ((p.id === 'usr-elderly-01' || p.id === 'usr-lakshmi-devi-01') && 
+            (p.full_name === 'Kamla Devi' || p.full_name === 'Lakshmi Devi')) {
+          updated = true;
+          return DEMO_PATIENT;
+        }
+        return p;
+      });
+      if (updated) {
+        localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(upgraded));
+      }
+    } catch (e) {}
   }
+
   if (!localStorage.getItem(STORAGE_KEYS.MEDICINES)) {
     localStorage.setItem(
       STORAGE_KEYS.MEDICINES,
       JSON.stringify(getInitialMedicines())
     );
+  } else {
+    // If existing medicines still contain old unedited seed items, refresh demo medicines
+    try {
+      const existingMeds: Medicine[] = JSON.parse(
+        localStorage.getItem(STORAGE_KEYS.MEDICINES) || '[]'
+      );
+      const hasOldSeeds = existingMeds.some((m) => m.id === 'med-amlodipine-01' || m.id === 'med-metformin-02');
+      const hasNewSeeds = existingMeds.some((m) => m.id === 'med-paracetamol-01');
+      if (hasOldSeeds && !hasNewSeeds) {
+        const customMeds = existingMeds.filter((m) => !m.id.startsWith('med-amlodipine') && !m.id.startsWith('med-metformin') && !m.id.startsWith('med-atorvastatin'));
+        localStorage.setItem(
+          STORAGE_KEYS.MEDICINES,
+          JSON.stringify([...getInitialMedicines(), ...customMeds])
+        );
+      }
+    } catch (e) {}
   }
+
   if (!localStorage.getItem(STORAGE_KEYS.APPOINTMENTS)) {
     localStorage.setItem(
       STORAGE_KEYS.APPOINTMENTS,
@@ -81,7 +119,23 @@ export function ensureInitializedStore() {
       STORAGE_KEYS.HEALTH_READINGS,
       JSON.stringify(getInitialHealthReadings())
     );
+  } else {
+    // If stored health readings do not yet have the 3 new parameters (height, bmi, respiratory_rate), populate them
+    try {
+      const existingReadings: HealthReading[] = JSON.parse(
+        localStorage.getItem(STORAGE_KEYS.HEALTH_READINGS) || '[]'
+      );
+      const hasNewParams = existingReadings.some((r) => r.parameter === 'height' || r.parameter === 'bmi' || r.parameter === 'respiratory_rate');
+      if (!hasNewParams) {
+        const demoReadings = getInitialHealthReadings();
+        localStorage.setItem(
+          STORAGE_KEYS.HEALTH_READINGS,
+          JSON.stringify([...existingReadings, ...demoReadings.filter(r => ['height', 'bmi', 'respiratory_rate'].includes(r.parameter))])
+        );
+      }
+    } catch (e) {}
   }
+
   if (!localStorage.getItem(STORAGE_KEYS.MEDICINE_LOGS)) {
     localStorage.setItem(
       STORAGE_KEYS.MEDICINE_LOGS,
@@ -122,27 +176,40 @@ export function ensureInitializedStore() {
     const profiles: UserProfile[] = JSON.parse(
       localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]'
     );
-    const elderly = profiles.find((p) => p.role === 'elderly') || DEMO_ELDERLY_USER;
+    const elderly = profiles.find((p) => p.role === 'elderly') || DEMO_PATIENT;
     localStorage.setItem(
       STORAGE_KEYS.CURRENT_USER,
       JSON.stringify(elderly)
     );
+  } else {
+    // Check if current user is old unedited seed
+    try {
+      const cur = JSON.parse(localStorage.getItem(STORAGE_KEYS.CURRENT_USER) || '{}');
+      if ((cur.id === 'usr-elderly-01' || cur.id === 'usr-lakshmi-devi-01') && 
+          (cur.full_name === 'Kamla Devi' || cur.full_name === 'Lakshmi Devi')) {
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEMO_PATIENT));
+      }
+    } catch (e) {}
   }
 }
 
-export function getElderlyNameSync(userId?: string): string {
+export function getElderlyProfileSync(userId?: string): UserProfile {
   try {
     const profiles: UserProfile[] = JSON.parse(
       localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]'
     );
     if (userId) {
       const match = profiles.find((p) => p.id === userId);
-      if (match?.full_name) return match.full_name;
+      if (match) return match;
     }
     const elderly = profiles.find((p) => p.role === 'elderly');
-    if (elderly?.full_name) return elderly.full_name;
+    if (elderly) return elderly;
   } catch (e) {}
-  return 'Elderly User';
+  return DEMO_PATIENT;
+}
+
+export function getElderlyNameSync(userId?: string): string {
+  return getElderlyProfileSync(userId).full_name || 'Rahul Kumar';
 }
 
 export function getCaregiverNameSync(): string {
@@ -161,58 +228,58 @@ export function getCaregiverNameSync(): string {
 export async function loadDemoData(): Promise<void> {
   localStorage.setItem(
     STORAGE_KEYS.PROFILES,
-    JSON.stringify([DEMO_ELDERLY_USER, DEMO_CAREGIVER_USER])
+    JSON.stringify([DEMO_PATIENT, DEMO_CAREGIVER_USER])
   );
   localStorage.setItem(
     STORAGE_KEYS.MEDICINES,
-    JSON.stringify(getInitialMedicines())
+    JSON.stringify(getInitialMedicines(DEMO_PATIENT.id))
   );
   localStorage.setItem(
     STORAGE_KEYS.APPOINTMENTS,
-    JSON.stringify(getInitialAppointments())
+    JSON.stringify(getInitialAppointments(DEMO_PATIENT.id))
   );
   localStorage.setItem(
     STORAGE_KEYS.HEALTH_READINGS,
-    JSON.stringify(getInitialHealthReadings())
+    JSON.stringify(getInitialHealthReadings(DEMO_PATIENT.id))
   );
   localStorage.setItem(
     STORAGE_KEYS.MEDICINE_LOGS,
-    JSON.stringify(getInitialMedicineLogs())
+    JSON.stringify(getInitialMedicineLogs(DEMO_PATIENT.id))
   );
   localStorage.setItem(
     STORAGE_KEYS.NOTIFICATIONS,
-    JSON.stringify(getInitialNotifications())
+    JSON.stringify(getInitialNotifications(DEMO_PATIENT.id))
   );
   localStorage.setItem(
     STORAGE_KEYS.EMERGENCY_CONTACTS,
-    JSON.stringify(getInitialEmergencyContacts())
+    JSON.stringify(getInitialEmergencyContacts(DEMO_PATIENT.id))
   );
   localStorage.setItem(
     STORAGE_KEYS.EMERGENCY_EVENTS,
-    JSON.stringify(getInitialEmergencyEvents())
+    JSON.stringify(getInitialEmergencyEvents(DEMO_PATIENT.id))
   );
   localStorage.setItem(
     STORAGE_KEYS.CAREGIVER_RELATIONSHIPS,
-    JSON.stringify(getInitialCaregiverRelationships())
+    JSON.stringify(getInitialCaregiverRelationships(DEMO_PATIENT.id))
   );
   localStorage.setItem(
     STORAGE_KEYS.CAREGIVER_ACTIVITIES,
-    JSON.stringify(getInitialCaregiverActivity())
+    JSON.stringify(getInitialCaregiverActivity(DEMO_PATIENT.id))
   );
   localStorage.setItem(
     STORAGE_KEYS.CURRENT_USER,
-    JSON.stringify(DEMO_ELDERLY_USER)
+    JSON.stringify(DEMO_PATIENT)
   );
 
   // If live Supabase is configured, also push seeds to Supabase
   if (isSupabaseConfigured()) {
     try {
-      await supabase.from('profiles').upsert([DEMO_ELDERLY_USER, DEMO_CAREGIVER_USER]);
-      await supabase.from('medicines').upsert(getInitialMedicines());
-      await supabase.from('appointments').upsert(getInitialAppointments());
-      await supabase.from('health_readings').upsert(getInitialHealthReadings());
-      await supabase.from('notifications').upsert(getInitialNotifications());
-      await supabase.from('emergency_contacts').upsert(getInitialEmergencyContacts());
+      await supabase.from('profiles').upsert([DEMO_PATIENT, DEMO_CAREGIVER_USER]);
+      await supabase.from('medicines').upsert(getInitialMedicines(DEMO_PATIENT.id));
+      await supabase.from('appointments').upsert(getInitialAppointments(DEMO_PATIENT.id));
+      await supabase.from('health_readings').upsert(getInitialHealthReadings(DEMO_PATIENT.id));
+      await supabase.from('notifications').upsert(getInitialNotifications(DEMO_PATIENT.id));
+      await supabase.from('emergency_contacts').upsert(getInitialEmergencyContacts(DEMO_PATIENT.id));
     } catch (e) {
       console.warn('Supabase remote seed non-critical fallback:', e);
     }
@@ -506,7 +573,7 @@ export async function getMedicines(userId: string): Promise<Medicine[]> {
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
-      if (!error && data) return data as Medicine[];
+      if (!error && data && data.length > 0) return data as Medicine[];
     } catch (err) {
       console.warn('Supabase getMedicines fallback:', err);
     }
@@ -514,7 +581,14 @@ export async function getMedicines(userId: string): Promise<Medicine[]> {
   const list: Medicine[] = JSON.parse(
     localStorage.getItem(STORAGE_KEYS.MEDICINES) || '[]'
   );
-  return list.filter((m) => m.user_id === userId || !m.user_id);
+  const userList = list.filter((m) => m.user_id === userId || !m.user_id);
+  if (userList.length === 0 && (userId === DEMO_PATIENT.id || !userId || userId === 'usr-elderly-01' || userId === 'usr-lakshmi-devi-01')) {
+    const demoMeds = getInitialMedicines(userId);
+    const otherMeds = list.filter((m) => m.user_id !== userId && !!m.user_id);
+    localStorage.setItem(STORAGE_KEYS.MEDICINES, JSON.stringify([...demoMeds, ...otherMeds]));
+    return demoMeds;
+  }
+  return userList;
 }
 
 export async function addMedicine(
@@ -807,7 +881,7 @@ export async function getHealthReadings(
         .select('*')
         .eq('user_id', userId)
         .order('timestamp', { ascending: true });
-      if (!error && data) {
+      if (!error && data && data.length > 0) {
         return filterReadingsByTime(data as HealthReading[], filter);
       }
     } catch (err) {
@@ -817,7 +891,13 @@ export async function getHealthReadings(
   const list: HealthReading[] = JSON.parse(
     localStorage.getItem(STORAGE_KEYS.HEALTH_READINGS) || '[]'
   );
-  const userList = list.filter((r) => r.user_id === userId || !r.user_id);
+  let userList = list.filter((r) => r.user_id === userId || !r.user_id);
+  if (userList.length === 0 && (userId === DEMO_PATIENT.id || !userId || userId === 'usr-elderly-01' || userId === 'usr-lakshmi-devi-01')) {
+    const demoReadings = getInitialHealthReadings(userId);
+    const otherReadings = list.filter((r) => r.user_id !== userId && !!r.user_id);
+    localStorage.setItem(STORAGE_KEYS.HEALTH_READINGS, JSON.stringify([...demoReadings, ...otherReadings]));
+    userList = demoReadings;
+  }
   return filterReadingsByTime(userList, filter);
 }
 

@@ -8,11 +8,13 @@ export interface UserProfile {
   full_name: string;
   role: UserRole;
   age?: number;
+  gender?: string; // e.g. "Male", "Female"
   phone?: string;
   preferred_hospital?: string;
   ambulance_contact?: string;
   reminder_sound?: boolean;
   reminder_grace_period?: number; // minutes
+  is_demo?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -25,10 +27,12 @@ export interface Medicine {
   name: string;
   dosage: string;
   scheduled_time: string; // e.g., "08:00 AM"
-  frequency: string; // e.g., "Once Daily", "Twice Daily"
+  frequency: string; // e.g., "Once Daily", "As prescribed", "As directed"
   start_date: string;
   end_date?: string;
   notes?: string;
+  purpose?: string; // e.g. "Fever/Pain", "Allergy symptoms", "Rehydration", "Supplement record"
+  is_demo?: boolean; // Demo indicator
   status: MedicineStatus;
   snoozed_until?: string | null;
   created_at: string;
@@ -72,7 +76,10 @@ export type HealthParameter =
   | 'spo2' 
   | 'temperature' 
   | 'blood_sugar' 
-  | 'weight';
+  | 'weight'
+  | 'height'
+  | 'bmi'
+  | 'respiratory_rate';
 
 export type HealthStatus = 'NORMAL' | 'ATTENTION' | 'NEEDS REVIEW';
 
@@ -86,6 +93,7 @@ export interface HealthReading {
   unit: string;
   status: HealthStatus;
   note?: string;
+  is_demo?: boolean;
   timestamp: string;
   created_at: string;
 }

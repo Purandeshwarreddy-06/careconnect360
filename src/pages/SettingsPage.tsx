@@ -213,8 +213,8 @@ export const SettingsPage: React.FC = () => {
               <span>Hackathon Demonstration Seeder</span>
             </div>
             <p className="text-xs text-slate-300 leading-relaxed">
-              Reset or reload clean fictional data for Lakshmi Devi (Elderly) and Rohan Verma (Caregiver) 
-              including prescriptions, vital observations, appointments, and alerts.
+              Reset or reload clean fictional demo data for Rahul Kumar (Demo Patient, 45 yrs) and Rohan Verma (Caregiver) 
+              including 9 vital parameters, sample prescriptions, and doctor consultations.
             </p>
             <button
               type="button"

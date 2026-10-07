@@ -21,7 +21,10 @@ import {
   Sparkles, 
   ShieldAlert,
   Loader2,
-  Check
+  Check,
+  Ruler,
+  Gauge,
+  Wind
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import {
@@ -208,6 +211,9 @@ export const HomePage: React.FC = () => {
   const tempLatest = getLatestReading('temperature');
   const sugarLatest = getLatestReading('blood_sugar');
   const weightLatest = getLatestReading('weight');
+  const heightLatest = getLatestReading('height');
+  const bmiLatest = getLatestReading('bmi');
+  const respLatest = getLatestReading('respiratory_rate');
 
   // Chart data formatting
   const chartData = healthReadings
@@ -227,14 +233,14 @@ export const HomePage: React.FC = () => {
     (a) => a.status === 'TODAY' || a.status === 'UPCOMING'
   ) || appointments[0];
 
-  // Today's timeline events
+  // Today's timeline events matching sample demo medications
   const timelineEvents = [
-    { time: '08:00 AM', title: 'Amlodipine 5 mg', type: 'med', status: medicines.find(m => m.id === 'med-amlodipine-01')?.status || 'DUE' },
-    { time: '09:30 AM', title: 'Morning Blood Pressure Check', type: 'health', status: 'COMPLETED' },
-    { time: '01:30 PM', title: 'Metformin 500 mg (After Lunch)', type: 'med', status: medicines.find(m => m.id === 'med-metformin-02')?.status || 'SCHEDULED' },
+    { time: '08:00 AM', title: 'Paracetamol 500 mg (Fever/Pain)', type: 'med', status: medicines.find(m => m.name.toLowerCase().includes('paracetamol'))?.status || 'DUE' },
+    { time: '09:30 AM', title: 'Morning Blood Pressure Check (120/80)', type: 'health', status: 'COMPLETED' },
+    { time: '01:00 PM', title: 'Cetirizine 10 mg (Allergy symptoms)', type: 'med', status: medicines.find(m => m.name.toLowerCase().includes('cetirizine'))?.status || 'SCHEDULED' },
     { time: '04:00 PM', title: 'Dr. Ananya Rao Virtual Consultation', type: 'apt', status: 'UPCOMING' },
-    { time: '08:00 PM', title: 'Vitamin D3 60,000 IU', type: 'med', status: 'SCHEDULED' },
-    { time: '09:30 PM', title: 'Atorvastatin 10 mg (Bedtime)', type: 'med', status: 'SCHEDULED' },
+    { time: '05:00 PM', title: 'ORS 1 sachet (Rehydration)', type: 'med', status: medicines.find(m => m.name.toLowerCase().includes('ors'))?.status || 'SCHEDULED' },
+    { time: '08:00 PM', title: 'Vitamin D3 (Supplement record)', type: 'med', status: medicines.find(m => m.name.toLowerCase().includes('vitamin'))?.status || 'SCHEDULED' },
   ];
 
   if (loading) {
@@ -273,9 +279,17 @@ export const HomePage: React.FC = () => {
         </div>
 
         <div className="relative z-10 p-6 sm:p-8 lg:p-10 max-w-3xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs font-bold uppercase tracking-wider mb-4">
-            <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-            <span>NIGHTCARE Active Platform • Elderly Care H10</span>
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs font-bold uppercase tracking-wider">
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+              <span>NIGHTCARE Active Platform • Elderly Care H10</span>
+            </div>
+            {(!user || user.is_demo || user.full_name === 'Rahul Kumar') && (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/40 text-cyan-300 text-xs font-bold shadow-sm">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                <span>Demo Patient: Rahul Kumar (Age: 45, Male) • Sample Data</span>
+              </div>
+            )}
           </div>
 
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight leading-tight">
@@ -415,10 +429,22 @@ export const HomePage: React.FC = () => {
                 <div className="mt-5 space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
-                      <h4 className="text-2xl font-extrabold text-white tracking-tight">
-                        {nextMedicine.name}
-                      </h4>
-                      <p className="text-sm text-cyan-300 font-medium mt-0.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-2xl font-extrabold text-white tracking-tight">
+                          {nextMedicine.name}
+                        </h4>
+                        {nextMedicine.purpose && (
+                          <span className="px-2.5 py-0.5 rounded-lg bg-cyan-500/10 border border-cyan-500/25 text-cyan-300 text-xs font-semibold">
+                            Purpose: {nextMedicine.purpose}
+                          </span>
+                        )}
+                        {(nextMedicine.is_demo || !nextMedicine.created_at) && (
+                          <span className="px-2.5 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] font-semibold">
+                            Demo Medication Data — Not a Prescription
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-cyan-300 font-medium mt-1">
                         Dosage: {nextMedicine.dosage} • {nextMedicine.frequency}
                       </p>
                     </div>
@@ -572,161 +598,233 @@ export const HomePage: React.FC = () => {
 
       {/* LIVE HEALTH STATUS CARDS (Section 7) */}
       <section className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <h3 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <Activity className="w-5 h-5 text-cyan-400" />
-              <span>Live Health Status</span>
-            </h3>
+              <h3 className="text-xl font-bold text-white tracking-tight">Live Health Status</h3>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/10 border border-cyan-500/25 text-cyan-300">
+                9 Clinical Vitals
+              </span>
+            </div>
             <p className="text-xs text-slate-400">
-              Recorded vital observations • Real Supabase telemetry
+              Continuous physiological monitoring • Sample Demo Telemetry (Rahul Kumar)
             </p>
           </div>
           <Link
             to="/health"
             className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
           >
-            <span>View Full Health Log</span>
+            <span>View Full Health Log & History</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5 sm:gap-4">
-          {/* 1. Heart Rate */}
-          <div
-            onClick={() => setChartParameter('heart_rate')}
-            className={`p-4 rounded-2xl bg-[#0B1220] border transition-all cursor-pointer ${
-              chartParameter === 'heart_rate'
-                ? 'border-cyan-500/60 ring-2 ring-cyan-500/20 bg-slate-900/90'
-                : 'border-white/[0.06] hover:border-slate-700'
-            }`}
-          >
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>Heart Rate</span>
-              <Heart className="w-4 h-4 text-rose-500" />
-            </div>
-            <div className="mt-2 text-2xl font-black text-white tracking-tight font-mono">
-              {hrLatest ? hrLatest.value : '--'}
-              <span className="text-xs font-sans text-slate-400 font-normal ml-1">bpm</span>
-            </div>
-            <div className="mt-2 flex items-center justify-between text-[11px]">
-              <span className="text-emerald-400 font-semibold">{hrLatest?.status || 'NORMAL'}</span>
-              <span className="text-slate-400">Resting</span>
-            </div>
-          </div>
-
-          {/* 2. Blood Pressure */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-9 gap-3">
+          {/* 1. Blood Pressure */}
           <div
             onClick={() => setChartParameter('blood_pressure')}
-            className={`p-4 rounded-2xl bg-[#0B1220] border transition-all cursor-pointer ${
+            className={`p-3.5 rounded-2xl bg-[#0B1220] border transition-all cursor-pointer ${
               chartParameter === 'blood_pressure'
                 ? 'border-cyan-500/60 ring-2 ring-cyan-500/20 bg-slate-900/90'
                 : 'border-white/[0.06] hover:border-slate-700'
             }`}
           >
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>Blood Pressure</span>
-              <Activity className="w-4 h-4 text-blue-400" />
+            <div className="flex items-center justify-between text-[11px] text-slate-400">
+              <span className="truncate">Blood Press.</span>
+              <Activity className="w-3.5 h-3.5 text-blue-400 shrink-0" />
             </div>
-            <div className="mt-2 text-2xl font-black text-white tracking-tight font-mono">
-              {bpLatest?.systolic && bpLatest?.diastolic ? `${bpLatest.systolic}/${bpLatest.diastolic}` : '128/82'}
-              <span className="text-xs font-sans text-slate-400 font-normal ml-1">mmHg</span>
+            <div className="mt-2 text-xl font-black text-white tracking-tight font-mono">
+              {bpLatest?.systolic && bpLatest?.diastolic ? `${bpLatest.systolic}/${bpLatest.diastolic}` : '120/80'}
             </div>
-            <div className="mt-2 flex items-center justify-between text-[11px]">
-              <span className="text-amber-400 font-semibold">{bpLatest?.status || 'ATTENTION'}</span>
-              <span className="text-slate-400">Morning</span>
+            <div className="text-[10px] text-slate-400 font-sans">mmHg</div>
+            <div className="mt-2 flex items-center justify-between text-[10px]">
+              <span className="text-emerald-400 font-semibold">{bpLatest?.status || 'NORMAL'}</span>
+              <span className="text-slate-500">Resting</span>
+            </div>
+          </div>
+
+          {/* 2. Heart Rate */}
+          <div
+            onClick={() => setChartParameter('heart_rate')}
+            className={`p-3.5 rounded-2xl bg-[#0B1220] border transition-all cursor-pointer ${
+              chartParameter === 'heart_rate'
+                ? 'border-cyan-500/60 ring-2 ring-cyan-500/20 bg-slate-900/90'
+                : 'border-white/[0.06] hover:border-slate-700'
+            }`}
+          >
+            <div className="flex items-center justify-between text-[11px] text-slate-400">
+              <span className="truncate">Heart Rate</span>
+              <Heart className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+            </div>
+            <div className="mt-2 text-xl font-black text-white tracking-tight font-mono">
+              {hrLatest ? hrLatest.value : 72}
+            </div>
+            <div className="text-[10px] text-slate-400 font-sans">bpm</div>
+            <div className="mt-2 flex items-center justify-between text-[10px]">
+              <span className="text-emerald-400 font-semibold">{hrLatest?.status || 'NORMAL'}</span>
+              <span className="text-slate-500">Pulse</span>
             </div>
           </div>
 
           {/* 3. SpO2 */}
           <div
             onClick={() => setChartParameter('spo2')}
-            className={`p-4 rounded-2xl bg-[#0B1220] border transition-all cursor-pointer ${
+            className={`p-3.5 rounded-2xl bg-[#0B1220] border transition-all cursor-pointer ${
               chartParameter === 'spo2'
                 ? 'border-cyan-500/60 ring-2 ring-cyan-500/20 bg-slate-900/90'
                 : 'border-white/[0.06] hover:border-slate-700'
             }`}
           >
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>SpO₂</span>
-              <Droplet className="w-4 h-4 text-cyan-400" />
+            <div className="flex items-center justify-between text-[11px] text-slate-400">
+              <span className="truncate">SpO₂</span>
+              <Droplet className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
             </div>
-            <div className="mt-2 text-2xl font-black text-white tracking-tight font-mono">
-              {spo2Latest ? spo2Latest.value : '98'}
-              <span className="text-xs font-sans text-slate-400 font-normal ml-1">%</span>
+            <div className="mt-2 text-xl font-black text-white tracking-tight font-mono">
+              {spo2Latest ? spo2Latest.value : 98}
             </div>
-            <div className="mt-2 flex items-center justify-between text-[11px]">
+            <div className="text-[10px] text-slate-400 font-sans">%</div>
+            <div className="mt-2 flex items-center justify-between text-[10px]">
               <span className="text-emerald-400 font-semibold">{spo2Latest?.status || 'NORMAL'}</span>
-              <span className="text-slate-400">Stable</span>
+              <span className="text-slate-500">Optimal</span>
             </div>
           </div>
 
           {/* 4. Temperature */}
           <div
             onClick={() => setChartParameter('temperature')}
-            className={`p-4 rounded-2xl bg-[#0B1220] border transition-all cursor-pointer ${
+            className={`p-3.5 rounded-2xl bg-[#0B1220] border transition-all cursor-pointer ${
               chartParameter === 'temperature'
                 ? 'border-cyan-500/60 ring-2 ring-cyan-500/20 bg-slate-900/90'
                 : 'border-white/[0.06] hover:border-slate-700'
             }`}
           >
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>Temperature</span>
-              <Thermometer className="w-4 h-4 text-orange-400" />
+            <div className="flex items-center justify-between text-[11px] text-slate-400">
+              <span className="truncate">Temp</span>
+              <Thermometer className="w-3.5 h-3.5 text-orange-400 shrink-0" />
             </div>
-            <div className="mt-2 text-2xl font-black text-white tracking-tight font-mono">
-              {tempLatest ? tempLatest.value : '98.4'}
-              <span className="text-xs font-sans text-slate-400 font-normal ml-1">°F</span>
+            <div className="mt-2 text-xl font-black text-white tracking-tight font-mono">
+              {tempLatest ? tempLatest.value : 36.8}
             </div>
-            <div className="mt-2 flex items-center justify-between text-[11px]">
+            <div className="text-[10px] text-slate-400 font-sans">{tempLatest?.unit || '°C'}</div>
+            <div className="mt-2 flex items-center justify-between text-[10px]">
               <span className="text-emerald-400 font-semibold">{tempLatest?.status || 'NORMAL'}</span>
-              <span className="text-slate-400">Normal</span>
+              <span className="text-slate-500">Normal</span>
             </div>
           </div>
 
-          {/* 5. Blood Sugar */}
+          {/* 5. Blood Glucose */}
           <div
             onClick={() => setChartParameter('blood_sugar')}
-            className={`p-4 rounded-2xl bg-[#0B1220] border transition-all cursor-pointer ${
+            className={`p-3.5 rounded-2xl bg-[#0B1220] border transition-all cursor-pointer ${
               chartParameter === 'blood_sugar'
                 ? 'border-cyan-500/60 ring-2 ring-cyan-500/20 bg-slate-900/90'
                 : 'border-white/[0.06] hover:border-slate-700'
             }`}
           >
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>Blood Sugar</span>
-              <Flame className="w-4 h-4 text-amber-400" />
+            <div className="flex items-center justify-between text-[11px] text-slate-400">
+              <span className="truncate">Glucose</span>
+              <Flame className="w-3.5 h-3.5 text-amber-400 shrink-0" />
             </div>
-            <div className="mt-2 text-2xl font-black text-white tracking-tight font-mono">
-              {sugarLatest ? sugarLatest.value : '132'}
-              <span className="text-xs font-sans text-slate-400 font-normal ml-1">mg/dL</span>
+            <div className="mt-2 text-xl font-black text-white tracking-tight font-mono">
+              {sugarLatest ? sugarLatest.value : 95}
             </div>
-            <div className="mt-2 flex items-center justify-between text-[11px]">
-              <span className="text-amber-400 font-semibold">{sugarLatest?.status || 'ATTENTION'}</span>
-              <span className="text-slate-400">Post-meal</span>
+            <div className="text-[10px] text-slate-400 font-sans">mg/dL</div>
+            <div className="mt-2 flex items-center justify-between text-[10px]">
+              <span className="text-emerald-400 font-semibold">{sugarLatest?.status || 'NORMAL'}</span>
+              <span className="text-slate-500">Fasting</span>
             </div>
           </div>
 
           {/* 6. Weight */}
           <div
             onClick={() => setChartParameter('weight')}
-            className={`p-4 rounded-2xl bg-[#0B1220] border transition-all cursor-pointer ${
+            className={`p-3.5 rounded-2xl bg-[#0B1220] border transition-all cursor-pointer ${
               chartParameter === 'weight'
                 ? 'border-cyan-500/60 ring-2 ring-cyan-500/20 bg-slate-900/90'
                 : 'border-white/[0.06] hover:border-slate-700'
             }`}
           >
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>Weight</span>
-              <Scale className="w-4 h-4 text-indigo-400" />
+            <div className="flex items-center justify-between text-[11px] text-slate-400">
+              <span className="truncate">Weight</span>
+              <Scale className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
             </div>
-            <div className="mt-2 text-2xl font-black text-white tracking-tight font-mono">
-              {weightLatest ? weightLatest.value : '64.5'}
-              <span className="text-xs font-sans text-slate-400 font-normal ml-1">kg</span>
+            <div className="mt-2 text-xl font-black text-white tracking-tight font-mono">
+              {weightLatest ? weightLatest.value : 68}
             </div>
-            <div className="mt-2 flex items-center justify-between text-[11px]">
+            <div className="text-[10px] text-slate-400 font-sans">kg</div>
+            <div className="mt-2 flex items-center justify-between text-[10px]">
               <span className="text-emerald-400 font-semibold">{weightLatest?.status || 'NORMAL'}</span>
-              <span className="text-slate-400">Maintain</span>
+              <span className="text-slate-500">Stable</span>
+            </div>
+          </div>
+
+          {/* 7. Height */}
+          <div
+            onClick={() => setChartParameter('height')}
+            className={`p-3.5 rounded-2xl bg-[#0B1220] border transition-all cursor-pointer ${
+              chartParameter === 'height'
+                ? 'border-cyan-500/60 ring-2 ring-cyan-500/20 bg-slate-900/90'
+                : 'border-white/[0.06] hover:border-slate-700'
+            }`}
+          >
+            <div className="flex items-center justify-between text-[11px] text-slate-400">
+              <span className="truncate">Height</span>
+              <Ruler className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+            </div>
+            <div className="mt-2 text-xl font-black text-white tracking-tight font-mono">
+              {heightLatest ? heightLatest.value : 170}
+            </div>
+            <div className="text-[10px] text-slate-400 font-sans">cm</div>
+            <div className="mt-2 flex items-center justify-between text-[10px]">
+              <span className="text-emerald-400 font-semibold">{heightLatest?.status || 'NORMAL'}</span>
+              <span className="text-slate-500">Adult</span>
+            </div>
+          </div>
+
+          {/* 8. BMI */}
+          <div
+            onClick={() => setChartParameter('bmi')}
+            className={`p-3.5 rounded-2xl bg-[#0B1220] border transition-all cursor-pointer ${
+              chartParameter === 'bmi'
+                ? 'border-cyan-500/60 ring-2 ring-cyan-500/20 bg-slate-900/90'
+                : 'border-white/[0.06] hover:border-slate-700'
+            }`}
+          >
+            <div className="flex items-center justify-between text-[11px] text-slate-400">
+              <span className="truncate">BMI Index</span>
+              <Gauge className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+            </div>
+            <div className="mt-2 text-xl font-black text-white tracking-tight font-mono">
+              {bmiLatest ? bmiLatest.value : 23.5}
+            </div>
+            <div className="text-[10px] text-slate-400 font-sans">kg/m²</div>
+            <div className="mt-2 flex items-center justify-between text-[10px]">
+              <span className="text-emerald-400 font-semibold">{bmiLatest?.status || 'NORMAL'}</span>
+              <span className="text-slate-500">Healthy</span>
+            </div>
+          </div>
+
+          {/* 9. Respiratory Rate */}
+          <div
+            onClick={() => setChartParameter('respiratory_rate')}
+            className={`p-3.5 rounded-2xl bg-[#0B1220] border transition-all cursor-pointer ${
+              chartParameter === 'respiratory_rate'
+                ? 'border-cyan-500/60 ring-2 ring-cyan-500/20 bg-slate-900/90'
+                : 'border-white/[0.06] hover:border-slate-700'
+            }`}
+          >
+            <div className="flex items-center justify-between text-[11px] text-slate-400">
+              <span className="truncate">Resp. Rate</span>
+              <Wind className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+            </div>
+            <div className="mt-2 text-xl font-black text-white tracking-tight font-mono">
+              {respLatest ? respLatest.value : 16}
+            </div>
+            <div className="text-[10px] text-slate-400 font-sans">/min</div>
+            <div className="mt-2 flex items-center justify-between text-[10px]">
+              <span className="text-emerald-400 font-semibold">{respLatest?.status || 'NORMAL'}</span>
+              <span className="text-slate-500">Eupnea</span>
             </div>
           </div>
         </div>

@@ -27,7 +27,8 @@ import {
   getCaregiverActivities, 
   acknowledgeEmergency, 
   resolveEmergency,
-  subscribeToLiveUpdates
+  subscribeToLiveUpdates,
+  getElderlyProfileSync
 } from '@/services/api';
 import { 
   Medicine, 
@@ -49,7 +50,10 @@ export const CaregiverPage: React.FC = () => {
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const elderlyId = 'usr-lakshmi-devi-01'; // Linked elderly user
+  const elderlyProfile = getElderlyProfileSync();
+  const elderlyId = elderlyProfile.id;
+  const elderlyName = elderlyProfile.full_name;
+  const elderlyAge = elderlyProfile.age || 45;
 
   const fetchData = async () => {
     try {
@@ -151,7 +155,7 @@ export const CaregiverPage: React.FC = () => {
             <span>Family & Caregiver Command Hub</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Family Care Portal • Lakshmi Devi (74 yrs)
+            Family Care Portal • {elderlyName} ({elderlyAge} yrs)
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
             Real-time remote caregiver supervision, adherence metrics, and immediate escalation alerts
@@ -211,11 +215,11 @@ export const CaregiverPage: React.FC = () => {
                 Mark Resolved
               </button>
               <a
-                href="tel:+919876543210"
+                href={`tel:${elderlyProfile.phone || '+919876512340'}`}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-1.5"
               >
                 <PhoneCall className="w-3.5 h-3.5" />
-                <span>Call Lakshmi</span>
+                <span>Call {elderlyName.split(' ')[0]}</span>
               </a>
             </div>
           </div>
@@ -305,7 +309,7 @@ export const CaregiverPage: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-lg font-bold text-white tracking-tight">Live Activity Feed</h3>
-                <p className="text-xs text-slate-400">Instant chronological telemetry from Lakshmi Devi</p>
+                <p className="text-xs text-slate-400">Instant chronological telemetry from {elderlyName}</p>
               </div>
             </div>
             <span className="text-xs font-mono text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded-full">

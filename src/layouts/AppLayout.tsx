@@ -74,7 +74,7 @@ export const AppLayout: React.FC = () => {
   const handleRoleSwitch = async (role: 'elderly' | 'caregiver') => {
     await switchRole(role);
     setIsProfileDropdownOpen(false);
-    setDemoActionToast(`Switched active view to ${role === 'elderly' ? 'Lakshmi Devi (Elderly)' : 'Rohan Verma (Caregiver)'}`);
+    setDemoActionToast(`Switched active view to ${role === 'elderly' ? 'Rahul Kumar (Demo Patient)' : 'Rohan Verma (Caregiver)'}`);
     setTimeout(() => setDemoActionToast(null), 3000);
     if (role === 'caregiver') {
       navigate('/caregiver');
@@ -135,7 +135,7 @@ export const AppLayout: React.FC = () => {
         <div className="hidden md:flex flex-col items-center">
           <div className="flex items-center gap-2.5">
             <span className="text-base lg:text-lg font-bold text-white tracking-tight">
-              {getGreeting()}, <span className="text-cyan-400 font-extrabold">{user?.full_name || 'Lakshmi Devi'}</span>
+              {getGreeting()}, <span className="text-cyan-400 font-extrabold">{user?.full_name || 'Rahul Kumar'}</span>
             </span>
             <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
               <Radio className="w-3 h-3 animate-pulse text-emerald-400" />
@@ -200,7 +200,7 @@ export const AppLayout: React.FC = () => {
               </div>
               <div className="hidden sm:flex flex-col text-left">
                 <span className="text-xs font-semibold text-white leading-tight">
-                  {user?.full_name || 'Lakshmi Devi'}
+                  {user?.full_name || 'Rahul Kumar'}
                 </span>
                 <span className="text-[10px] text-cyan-400 font-medium capitalize">
                   {user?.role || 'elderly'}
@@ -234,7 +234,7 @@ export const AppLayout: React.FC = () => {
                         : 'text-slate-300 hover:bg-slate-900'
                     }`}
                   >
-                    <span>Lakshmi Devi (Elderly User)</span>
+                    <span>Rahul Kumar (Demo Patient)</span>
                     {user?.role === 'elderly' && <Check className="w-3.5 h-3.5 text-cyan-400" />}
                   </button>
                   <button
