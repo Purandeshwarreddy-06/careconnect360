@@ -260,11 +260,11 @@ export async function loadDemoData(): Promise<void> {
   );
   localStorage.setItem(
     STORAGE_KEYS.CAREGIVER_RELATIONSHIPS,
-    JSON.stringify(getInitialCaregiverRelationships(DEMO_PATIENT.id))
+    JSON.stringify(getInitialCaregiverRelationships())
   );
   localStorage.setItem(
     STORAGE_KEYS.CAREGIVER_ACTIVITIES,
-    JSON.stringify(getInitialCaregiverActivity(DEMO_PATIENT.id))
+    JSON.stringify(getInitialCaregiverActivity())
   );
   localStorage.setItem(
     STORAGE_KEYS.CURRENT_USER,
