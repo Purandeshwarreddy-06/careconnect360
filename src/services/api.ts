@@ -531,7 +531,8 @@ export async function recordMedicineAction(
   medicineId: string,
   userId: string,
   action: 'TAKEN' | 'SNOOZED' | 'MISSED',
-  notes?: string
+  notes?: string,
+  snoozeMinutes: number = 15
 ): Promise<{ medicine: Medicine; log: MedicineLog }> {
   ensureInitializedStore();
   const medicines: Medicine[] = JSON.parse(
@@ -548,11 +549,13 @@ export async function recordMedicineAction(
 
   if (action === 'TAKEN') {
     newStatus = 'TAKEN';
+    snoozedUntil = null;
   } else if (action === 'SNOOZED') {
     newStatus = 'SNOOZED';
-    snoozedUntil = new Date(now.getTime() + 15 * 60000).toISOString();
+    snoozedUntil = new Date(now.getTime() + snoozeMinutes * 60000).toISOString();
   } else if (action === 'MISSED') {
     newStatus = 'MISSED';
+    snoozedUntil = null;
   }
 
   // Update Medicine
@@ -569,7 +572,7 @@ export async function recordMedicineAction(
     scheduled_time: med.scheduled_time,
     actual_time: now.toISOString(),
     status: action,
-    notes: notes || (action === 'TAKEN' ? `Taken at ${timeFormatted}` : action),
+    notes: notes || (action === 'TAKEN' ? `Taken at ${timeFormatted}` : action === 'SNOOZED' ? `Snoozed for ${snoozeMinutes}m` : 'Marked as not taken'),
     created_at: now.toISOString(),
   };
 
@@ -604,33 +607,41 @@ export async function recordMedicineAction(
     addNotification({
       user_id: userId,
       title: 'Medicine Taken',
-      message: `${med.name} logged as taken at ${timeFormatted}. Excellent adherence!`,
+      message: `${med.name} logged as taken at ${timeFormatted}. Adherence updated!`,
       type: 'MEDICINE_DUE',
     });
   } else if (action === 'SNOOZED') {
+    const nextTime = new Date(snoozedUntil!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     addCaregiverActivity({
       user_id: userId,
       elderly_name: 'Lakshmi Devi',
-      message: `Snoozed ${med.name} reminder by 15 minutes.`,
+      message: `Snoozed ${med.name} reminder by ${snoozeMinutes} minutes (next reminder at ${nextTime}).`,
       type: 'medicine',
     });
     addNotification({
       user_id: userId,
       title: 'Reminder Snoozed',
-      message: `${med.name} reminder moved forward by 15 minutes.`,
+      message: `${med.name} reminder moved forward by ${snoozeMinutes} minutes. Next reminder at ${nextTime}.`,
       type: 'MEDICINE_DUE',
     });
   } else if (action === 'MISSED') {
     addCaregiverActivity({
       user_id: userId,
       elderly_name: 'Lakshmi Devi',
-      message: `ALERT: ${med.name} scheduled for ${med.scheduled_time} was marked as missed.`,
+      message: `ALERT: ${med.name} scheduled for ${med.scheduled_time} was marked as missed!`,
       type: 'medicine',
     });
     addNotification({
       user_id: userId,
       title: 'Medicine Missed',
-      message: `Scheduled dose of ${med.name} was not taken. Family caregiver notified.`,
+      message: `Scheduled dose of ${med.name} was marked as not taken. Family caregiver has been notified.`,
+      type: 'MEDICINE_MISSED',
+    });
+    // Explicit notification for the linked caregiver
+    addNotification({
+      user_id: DEMO_CAREGIVER_USER.id,
+      title: 'ALERT: Medicine Missed',
+      message: `Lakshmi Devi missed scheduled dose of ${med.name} (${med.dosage}) scheduled for ${med.scheduled_time}.`,
       type: 'MEDICINE_MISSED',
     });
   }

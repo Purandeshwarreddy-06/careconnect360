@@ -113,7 +113,7 @@ CREATE TABLE IF NOT EXISTS public.emergency_events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     timestamp TIMESTAMPTZ DEFAULT NOW(),
-    status TEXT NOT NULL DEFAULT 'TRIGGERED' CHECK (status IN ('TRIGGERED', 'ACKNOWLEDGED', 'RESOLVED')),
+    status TEXT NOT NULL DEFAULT 'ACTIVATED' CHECK (status IN ('ACTIVATED', 'TRIGGERED', 'ACKNOWLEDGED', 'RESOLVED')),
     notes TEXT,
     location TEXT DEFAULT 'Home - 42 Heritage Gardens',
     caregiver_notified BOOLEAN DEFAULT true,

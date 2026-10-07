@@ -119,7 +119,7 @@ export interface EmergencyContact {
   updated_at: string;
 }
 
-export type EmergencyStatus = 'TRIGGERED' | 'ACKNOWLEDGED' | 'RESOLVED';
+export type EmergencyStatus = 'ACTIVATED' | 'TRIGGERED' | 'ACKNOWLEDGED' | 'RESOLVED';
 
 export interface EmergencyEvent {
   id: string;
