@@ -28,6 +28,7 @@ import {
   getMedicineLogs,
   subscribeToLiveUpdates
 } from '@/services/api';
+import { soundEffects } from '@/utils/audio';
 import { Medicine, MedicineLog, MedicineStatus } from '@/types';
 
 export const MedicinesPage: React.FC = () => {
@@ -184,6 +185,7 @@ export const MedicinesPage: React.FC = () => {
     try {
       await recordMedicineAction(medicineId, user.id, action);
       if (action === 'TAKEN') {
+        soundEffects.playMedicineChime();
         confetti({
           particleCount: 50,
           spread: 60,

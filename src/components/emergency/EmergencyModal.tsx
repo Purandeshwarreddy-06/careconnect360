@@ -18,6 +18,7 @@ import {
   acknowledgeEmergency, 
   resolveEmergency 
 } from '@/services/api';
+import { soundEffects } from '@/utils/audio';
 import { EmergencyContact, EmergencyEvent } from '@/types';
 
 interface EmergencyModalProps {
@@ -53,6 +54,7 @@ export const EmergencyModal: React.FC<EmergencyModalProps> = ({ isOpen, onClose 
         'Home - 42 Heritage Gardens',
         customNote.trim() || 'Urgent assistance requested from emergency SOS trigger.'
       );
+      soundEffects.playEmergencyAlarm();
       setCurrentEvent(event);
       setStage('active');
     } catch (err) {

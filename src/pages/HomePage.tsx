@@ -44,6 +44,7 @@ import {
   getNotifications,
   subscribeToLiveUpdates
 } from '@/services/api';
+import { soundEffects } from '@/utils/audio';
 import { Medicine, HealthReading, Appointment, NotificationItem } from '@/types';
 import { HEALTHCARE_IMAGES, FALLBACK_IMAGE } from '@/assets/images';
 import { EmergencyModal } from '@/components/emergency/EmergencyModal';
@@ -113,6 +114,7 @@ export const HomePage: React.FC = () => {
     setActionInProgress(medicineId);
     try {
       await recordMedicineAction(medicineId, user.id, 'TAKEN');
+      soundEffects.playMedicineChime();
       confetti({
         particleCount: 60,
         spread: 70,
