@@ -42,12 +42,15 @@ import {
   getHealthReadings, 
   getAppointments, 
   getNotifications,
-  subscribeToLiveUpdates
+  subscribeToLiveUpdates,
+  isMedicineDueTime,
+  getCaregiverNameSync
 } from '@/services/api';
 import { soundEffects } from '@/utils/audio';
 import { Medicine, HealthReading, Appointment, NotificationItem } from '@/types';
 import { HEALTHCARE_IMAGES, FALLBACK_IMAGE } from '@/assets/images';
 import { EmergencyModal } from '@/components/emergency/EmergencyModal';
+import { SnoozeModal } from '@/components/medicines/SnoozeModal';
 
 export const HomePage: React.FC = () => {
   const { user } = useAuth();
@@ -90,6 +93,18 @@ export const HomePage: React.FC = () => {
     }
   };
 
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  const [snoozeModalOpen, setSnoozeModalOpen] = useState<boolean>(false);
+  const [snoozeTargetMed, setSnoozeTargetMed] = useState<Medicine | null>(null);
+
+  // Automatic real-time clock check every 5 seconds to detect due medicines on time
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
+
   useEffect(() => {
     fetchData();
     const unsubscribe = subscribeToLiveUpdates(() => {
@@ -98,10 +113,21 @@ export const HomePage: React.FC = () => {
     return () => unsubscribe();
   }, [user, chartTimeFilter]);
 
-  // Next medicine to take (status DUE or SCHEDULED)
-  const nextMedicine = medicines.find(
-    (m) => m.status === 'DUE' || m.status === 'SCHEDULED' || m.status === 'SNOOZED'
-  ) || medicines[0];
+  // Next medicine calculation:
+  // 1. High priority: Any medicine due right now that has not been taken or missed
+  const dueMedicine = medicines.find(
+    (m) => isMedicineDueTime(m, currentTime) && m.status !== 'TAKEN' && m.status !== 'MISSED'
+  );
+  // 2. Snoozed medicine
+  const snoozedMedicine = medicines.find((m) => m.status === 'SNOOZED');
+  // 3. Next upcoming scheduled medicine
+  const scheduledMedicine = medicines.find((m) => m.status === 'SCHEDULED');
+  // Display target
+  const nextMedicine = dueMedicine || snoozedMedicine || scheduledMedicine || (medicines.length > 0 ? medicines[0] : null);
+
+  const allMedsTaken = medicines.length > 0 && medicines.every((m) => m.status === 'TAKEN');
+  const isDue = nextMedicine ? isMedicineDueTime(nextMedicine, currentTime) : false;
+  const caregiverName = getCaregiverNameSync();
 
   // Adherence calculation
   const totalMeds = medicines.length;
@@ -131,13 +157,19 @@ export const HomePage: React.FC = () => {
     }
   };
 
-  // Handle SNOOZE action
-  const handleSnoozeMedicine = async (medicineId: string) => {
+  // Open Snooze Duration Modal
+  const handleOpenSnooze = (med: Medicine) => {
+    setSnoozeTargetMed(med);
+    setSnoozeModalOpen(true);
+  };
+
+  // Handle SNOOZE confirmation from Modal
+  const handleConfirmSnooze = async (medicineId: string, minutes: number) => {
     if (!user) return;
     setActionInProgress(medicineId);
     try {
-      await recordMedicineAction(medicineId, user.id, 'SNOOZED');
-      setActionSuccessMsg('Reminder snoozed for 15 minutes.');
+      await recordMedicineAction(medicineId, user.id, 'SNOOZED', undefined, minutes);
+      setActionSuccessMsg(`Reminder snoozed for ${minutes} minutes.`);
       setTimeout(() => setActionSuccessMsg(null), 3000);
       await fetchData();
     } catch (err) {
@@ -146,6 +178,7 @@ export const HomePage: React.FC = () => {
       setActionInProgress(null);
     }
   };
+
 
   // Handle NOT TAKEN action
   const handleMissedMedicine = async (medicineId: string) => {
@@ -289,7 +322,7 @@ export const HomePage: React.FC = () => {
             </div>
             <div>
               <span className="text-slate-400">Connected Caregiver:</span>{' '}
-              <span className="text-white font-medium">Rohan Verma (Active)</span>
+              <span className="text-white font-medium">{caregiverName} (Active)</span>
             </div>
             <div>
               <span className="text-slate-400">Next Doctor Review:</span>{' '}
@@ -302,105 +335,154 @@ export const HomePage: React.FC = () => {
       {/* 2-COLUMN SECTION: NEXT MEDICINE & UPCOMING APPOINTMENT */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* NEXT MEDICINE (Section 7 & 8) */}
-        <div className="lg:col-span-7 bg-[#0B1220]/90 border border-white/[0.08] rounded-3xl p-6 sm:p-7 shadow-xl glass-panel relative overflow-hidden flex flex-col justify-between">
-          <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-
-          <div>
-            <div className="flex items-center justify-between pb-4 border-b border-white/[0.06]">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2.5 rounded-xl bg-blue-600/20 text-cyan-400 border border-blue-500/30">
-                  <Pill className="w-5 h-5" />
+        {allMedsTaken ? (
+          <div className="lg:col-span-7 bg-[#0B1220]/90 border border-emerald-500/40 rounded-3xl p-6 sm:p-7 shadow-xl glass-panel relative overflow-hidden flex flex-col justify-between">
+            <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div>
+              <div className="flex items-center justify-between pb-4 border-b border-white/[0.06]">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white tracking-tight">Prescriptions Completed</h3>
+                    <p className="text-xs text-slate-400">All daily doses successfully taken</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white tracking-tight">Next Scheduled Medicine</h3>
-                  <p className="text-xs text-slate-400">Due medication alert & immediate logger</p>
-                </div>
-              </div>
-              
-              {nextMedicine && (
-                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                  nextMedicine.status === 'TAKEN'
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : nextMedicine.status === 'DUE'
-                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse'
-                    : nextMedicine.status === 'SNOOZED'
-                    ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
-                    : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                }`}>
-                  {nextMedicine.status}
+                <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  ALL DOSES TAKEN
                 </span>
+              </div>
+
+              <div className="mt-8 p-6 rounded-2xl bg-emerald-950/20 border border-emerald-500/20 text-center space-y-2">
+                <Check className="w-10 h-10 text-emerald-400 mx-auto" />
+                <h4 className="text-xl font-bold text-white">Great Job! All Daily Medications Complete</h4>
+                <p className="text-xs text-emerald-200/90 max-w-md mx-auto">
+                  You have logged all prescribed medications for today with 100% adherence. Your caregiver feed is up to date.
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 pt-4 border-t border-white/[0.06] text-xs text-slate-400 flex items-center justify-between">
+              <span>Next medication cycle begins tomorrow morning.</span>
+              <Link to="/medicines" className="text-cyan-400 hover:underline font-semibold">
+                View All Prescriptions →
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className={`lg:col-span-7 rounded-3xl p-6 sm:p-7 shadow-xl glass-panel relative overflow-hidden flex flex-col justify-between transition-all ${
+            isDue ? 'medicine-due-card-alert' : 'bg-[#0B1220]/90 border border-white/[0.08]'
+          }`}>
+            <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            <div>
+              <div className="flex items-center justify-between pb-4 border-b border-white/[0.06]">
+                <div className="flex items-center gap-2.5">
+                  <div className={`p-2.5 rounded-xl border ${
+                    isDue
+                      ? 'bg-red-500/20 text-red-400 border-red-500/40'
+                      : 'bg-blue-600/20 text-cyan-400 border-blue-500/30'
+                  }`}>
+                    <Pill className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white tracking-tight">
+                      {isDue ? 'Urgent: Medication Due Now' : 'Next Scheduled Medicine'}
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      {isDue ? 'Scheduled time reached • Immediate dose required' : 'Due medication alert & immediate logger'}
+                    </p>
+                  </div>
+                </div>
+                
+                {nextMedicine && (
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                    isDue
+                      ? 'bg-red-500/25 text-red-300 border border-red-500/50 medicine-due-badge-blink'
+                      : nextMedicine.status === 'TAKEN'
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      : nextMedicine.status === 'SNOOZED'
+                      ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                      : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                  }`}>
+                    {isDue && <span className="w-2 h-2 rounded-full bg-red-400 animate-ping shrink-0" />}
+                    {isDue ? 'MEDICINE DUE' : nextMedicine.status}
+                  </span>
+                )}
+              </div>
+
+              {nextMedicine ? (
+                <div className="mt-5 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-2xl font-extrabold text-white tracking-tight">
+                        {nextMedicine.name}
+                      </h4>
+                      <p className="text-sm text-cyan-300 font-medium mt-0.5">
+                        Dosage: {nextMedicine.dosage} • {nextMedicine.frequency}
+                      </p>
+                    </div>
+                    <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border ${
+                      isDue ? 'bg-red-950/60 border-red-500/50 text-red-200' : 'bg-slate-900 border-slate-800 text-slate-200'
+                    }`}>
+                      <Clock className={`w-4 h-4 ${isDue ? 'text-red-400 animate-pulse' : 'text-cyan-400'}`} />
+                      <span className="font-mono text-base font-bold">{nextMedicine.scheduled_time}</span>
+                    </div>
+                  </div>
+
+                  {nextMedicine.notes && (
+                    <p className="text-xs text-slate-400 bg-slate-950/60 p-3 rounded-xl border border-white/[0.04]">
+                      <span className="text-slate-300 font-semibold">Doctor's Instruction:</span> {nextMedicine.notes}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="py-8 text-center text-slate-400 text-sm">
+                  No medicines scheduled at this hour.
+                </div>
               )}
             </div>
 
-            {nextMedicine ? (
-              <div className="mt-5 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h4 className="text-2xl font-extrabold text-white tracking-tight">
-                      {nextMedicine.name}
-                    </h4>
-                    <p className="text-sm text-cyan-300 font-medium mt-0.5">
-                      Dosage: {nextMedicine.dosage} • {nextMedicine.frequency}
-                    </p>
-                  </div>
-                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-200">
-                    <Clock className="w-4 h-4 text-cyan-400" />
-                    <span className="font-mono text-base font-bold">{nextMedicine.scheduled_time}</span>
-                  </div>
-                </div>
+            {/* ACTION BUTTONS: TAKEN, SNOOZE, NOT TAKEN (Section 7) */}
+            {nextMedicine && (
+              <div className="mt-6 pt-5 border-t border-white/[0.06] flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  disabled={actionInProgress === nextMedicine.id}
+                  onClick={() => handleTakeMedicine(nextMedicine.id)}
+                  className="flex-1 min-w-[130px] px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition-all transform active:scale-95 disabled:opacity-50"
+                >
+                  {actionInProgress === nextMedicine.id ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Check className="w-4 h-4" />
+                  )}
+                  <span>TAKEN</span>
+                </button>
 
-                {nextMedicine.notes && (
-                  <p className="text-xs text-slate-400 bg-slate-950/60 p-3 rounded-xl border border-white/[0.04]">
-                    <span className="text-slate-300 font-semibold">Doctor's Instruction:</span> {nextMedicine.notes}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div className="py-8 text-center text-slate-400 text-sm">
-                No medicines scheduled at this hour.
+                <button
+                  type="button"
+                  disabled={actionInProgress === nextMedicine.id}
+                  onClick={() => handleOpenSnooze(nextMedicine)}
+                  className="flex-1 min-w-[120px] px-4 py-3 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/40 text-amber-300 font-bold text-sm rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+                >
+                  <Clock className="w-4 h-4" />
+                  <span>SNOOZE</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={actionInProgress === nextMedicine.id}
+                  onClick={() => handleMissedMedicine(nextMedicine.id)}
+                  className="flex-1 min-w-[120px] px-4 py-3 bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-300 font-bold text-sm rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+                >
+                  <AlertCircle className="w-4 h-4" />
+                  <span>NOT TAKEN</span>
+                </button>
               </div>
             )}
           </div>
-
-          {/* ACTION BUTTONS: TAKEN, SNOOZE, NOT TAKEN (Section 7) */}
-          {nextMedicine && (
-            <div className="mt-6 pt-5 border-t border-white/[0.06] flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                disabled={actionInProgress === nextMedicine.id}
-                onClick={() => handleTakeMedicine(nextMedicine.id)}
-                className="flex-1 min-w-[130px] px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition-all transform active:scale-95 disabled:opacity-50"
-              >
-                {actionInProgress === nextMedicine.id ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Check className="w-4 h-4" />
-                )}
-                <span>TAKEN</span>
-              </button>
-
-              <button
-                type="button"
-                disabled={actionInProgress === nextMedicine.id}
-                onClick={() => handleSnoozeMedicine(nextMedicine.id)}
-                className="flex-1 min-w-[120px] px-4 py-3 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/40 text-amber-300 font-bold text-sm rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
-              >
-                <Clock className="w-4 h-4" />
-                <span>SNOOZE (15m)</span>
-              </button>
-
-              <button
-                type="button"
-                disabled={actionInProgress === nextMedicine.id}
-                onClick={() => handleMissedMedicine(nextMedicine.id)}
-                className="flex-1 min-w-[120px] px-4 py-3 bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-300 font-bold text-sm rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
-              >
-                <AlertCircle className="w-4 h-4" />
-                <span>NOT TAKEN</span>
-              </button>
-            </div>
-          )}
-        </div>
+        )}
 
         {/* UPCOMING APPOINTMENT & CONSULTATION (Section 7 & 10) */}
         <div className="lg:col-span-5 bg-[#0B1220]/90 border border-white/[0.08] rounded-3xl p-6 sm:p-7 shadow-xl glass-panel flex flex-col justify-between">
@@ -844,7 +926,7 @@ export const HomePage: React.FC = () => {
 
           <div className="mt-6 pt-4 border-t border-white/[0.06] text-center">
             <span className="text-[11px] text-slate-400">
-              Connected to Caregiver: <strong className="text-slate-300">Rohan Verma (Son)</strong>
+              Connected to Caregiver: <strong className="text-slate-300">{caregiverName} (Caregiver)</strong>
             </span>
           </div>
         </div>
@@ -855,6 +937,15 @@ export const HomePage: React.FC = () => {
         isOpen={isEmergencyOpen}
         onClose={() => setIsEmergencyOpen(false)}
       />
+
+      {/* Snooze Duration Selector Modal */}
+      <SnoozeModal
+        isOpen={snoozeModalOpen}
+        onClose={() => setSnoozeModalOpen(false)}
+        medicine={snoozeTargetMed}
+        onConfirm={handleConfirmSnooze}
+      />
     </div>
   );
 };
+

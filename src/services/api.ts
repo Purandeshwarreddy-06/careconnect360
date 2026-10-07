@@ -119,12 +119,43 @@ export function ensureInitializedStore() {
     );
   }
   if (!localStorage.getItem(STORAGE_KEYS.CURRENT_USER)) {
+    const profiles: UserProfile[] = JSON.parse(
+      localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]'
+    );
+    const elderly = profiles.find((p) => p.role === 'elderly') || DEMO_ELDERLY_USER;
     localStorage.setItem(
       STORAGE_KEYS.CURRENT_USER,
-      JSON.stringify(DEMO_ELDERLY_USER)
+      JSON.stringify(elderly)
     );
   }
 }
+
+export function getElderlyNameSync(userId?: string): string {
+  try {
+    const profiles: UserProfile[] = JSON.parse(
+      localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]'
+    );
+    if (userId) {
+      const match = profiles.find((p) => p.id === userId);
+      if (match?.full_name) return match.full_name;
+    }
+    const elderly = profiles.find((p) => p.role === 'elderly');
+    if (elderly?.full_name) return elderly.full_name;
+  } catch (e) {}
+  return 'Elderly User';
+}
+
+export function getCaregiverNameSync(): string {
+  try {
+    const profiles: UserProfile[] = JSON.parse(
+      localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]'
+    );
+    const caregiver = profiles.find((p) => p.role === 'caregiver');
+    if (caregiver?.full_name) return caregiver.full_name;
+  } catch (e) {}
+  return 'Caregiver';
+}
+
 
 // Reset or Load Demo Data (Section 18)
 export async function loadDemoData(): Promise<void> {
@@ -202,15 +233,33 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
           .select('*')
           .eq('id', user.id)
           .single();
-        if (profile) return profile as UserProfile;
+        if (profile) {
+          localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(profile));
+          return profile as UserProfile;
+        }
       }
     } catch (err) {
       console.warn('Supabase auth check fallback:', err);
     }
   }
+  const profiles: UserProfile[] = JSON.parse(
+    localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]'
+  );
   const local = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-  return local ? JSON.parse(local) : DEMO_ELDERLY_USER;
+  if (local) {
+    const parsed = JSON.parse(local);
+    const match = profiles.find((p) => p.id === parsed.id);
+    if (match) {
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(match));
+      return match;
+    }
+    return parsed;
+  }
+  const elderly = profiles.find((p) => p.role === 'elderly') || DEMO_ELDERLY_USER;
+  localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(elderly));
+  return elderly;
 }
+
 
 export async function loginUser(email: string, pass: string): Promise<UserProfile> {
   ensureInitializedStore();
@@ -339,7 +388,31 @@ export async function logoutUser(): Promise<void> {
 
 export async function switchDemoRole(role: UserRole): Promise<UserProfile> {
   ensureInitializedStore();
-  const target = role === 'elderly' ? DEMO_ELDERLY_USER : DEMO_CAREGIVER_USER;
+  let target: UserProfile | null = null;
+  const demoId = role === 'elderly' ? DEMO_ELDERLY_USER.id : DEMO_CAREGIVER_USER.id;
+  if (isSupabaseConfigured()) {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', demoId)
+        .single();
+      if (!error && data) {
+        target = data as UserProfile;
+      }
+    } catch (err) {
+      console.warn('Supabase switchDemoRole fallback:', err);
+    }
+  }
+  if (!target) {
+    const profiles: UserProfile[] = JSON.parse(
+      localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]'
+    );
+    target = profiles.find((p) => p.id === demoId || p.role === role) || null;
+  }
+  if (!target) {
+    target = role === 'elderly' ? DEMO_ELDERLY_USER : DEMO_CAREGIVER_USER;
+  }
   localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(target));
   broadcastUpdate('AUTH_STATE_CHANGED', target);
   return target;
@@ -363,7 +436,9 @@ export async function getProfile(userId: string): Promise<UserProfile> {
   const profiles: UserProfile[] = JSON.parse(
     localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]'
   );
-  return profiles.find((p) => p.id === userId) || DEMO_ELDERLY_USER;
+  const found = profiles.find((p) => p.id === userId);
+  if (found) return found;
+  return userId === DEMO_CAREGIVER_USER.id ? DEMO_CAREGIVER_USER : DEMO_ELDERLY_USER;
 }
 
 export async function updateProfile(
@@ -371,45 +446,55 @@ export async function updateProfile(
   updates: Partial<UserProfile>
 ): Promise<UserProfile> {
   ensureInitializedStore();
+  let updatedRecord: UserProfile | null = null;
+
   if (isSupabaseConfigured()) {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq('id', userId)
+        .upsert({ id: userId, ...updates, updated_at: new Date().toISOString() })
         .select()
         .single();
       if (!error && data) {
-        broadcastUpdate('PROFILE_UPDATED', data);
-        return data as UserProfile;
+        updatedRecord = data as UserProfile;
       }
     } catch (err) {
       console.warn('Supabase updateProfile fallback:', err);
     }
   }
+
   const profiles: UserProfile[] = JSON.parse(
     localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]'
   );
   const idx = profiles.findIndex((p) => p.id === userId);
-  const updated = {
-    ...(idx >= 0 ? profiles[idx] : DEMO_ELDERLY_USER),
+  const fallback = userId === DEMO_CAREGIVER_USER.id ? DEMO_CAREGIVER_USER : DEMO_ELDERLY_USER;
+  const updated: UserProfile = {
+    ...(idx >= 0 ? profiles[idx] : fallback),
+    ...(updatedRecord || {}),
     ...updates,
     updated_at: new Date().toISOString(),
   };
+
   if (idx >= 0) profiles[idx] = updated;
   else profiles.push(updated);
 
   localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(profiles));
+
   const curr = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
   if (curr) {
     const curObj = JSON.parse(curr);
-    if (curObj.id === userId) {
+    if (curObj.id === userId || curObj.role === updated.role) {
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updated));
     }
+  } else {
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updated));
   }
+
   broadcastUpdate('PROFILE_UPDATED', updated);
+  broadcastUpdate('AUTH_STATE_CHANGED', updated);
   return updated;
 }
+
 
 // MEDICINES
 export async function getMedicines(userId: string): Promise<Medicine[]> {
@@ -466,7 +551,7 @@ export async function addMedicine(
   // Add activity log
   addCaregiverActivity({
     user_id: newMed.user_id,
-    elderly_name: 'Lakshmi Devi',
+    elderly_name: getElderlyNameSync(newMed.user_id),
     message: `Added new scheduled medicine: ${newMed.name} (${newMed.dosage}).`,
     type: 'medicine',
   });
@@ -474,6 +559,41 @@ export async function addMedicine(
   broadcastUpdate('MEDICINE_CHANGED', newMed);
   return newMed;
 }
+
+export function parseTimeToMinutes(timeStr: string): number {
+  if (!timeStr) return -1;
+  const cleaned = timeStr.trim().toUpperCase();
+  const isPM = cleaned.includes('PM');
+  const isAM = cleaned.includes('AM');
+  const match = cleaned.match(/(\d{1,2})[:.](\d{2})/);
+  if (!match) return -1;
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  if (isPM && hours < 12) hours += 12;
+  if (isAM && hours === 12) hours = 0;
+  return hours * 60 + minutes;
+}
+
+export function isMedicineDueTime(med: Medicine, now: Date = new Date()): boolean {
+  if (med.status === 'TAKEN' || med.status === 'MISSED') {
+    return false;
+  }
+  if (med.status === 'SNOOZED') {
+    if (med.snoozed_until) {
+      const snoozeExpiry = new Date(med.snoozed_until).getTime();
+      return snoozeExpiry <= now.getTime();
+    }
+    return false;
+  }
+  if (med.status === 'DUE') {
+    return true;
+  }
+  const scheduledMinutes = parseTimeToMinutes(med.scheduled_time);
+  if (scheduledMinutes === -1) return false;
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  return currentMinutes >= scheduledMinutes;
+}
+
 
 export async function updateMedicine(
   id: string,
@@ -597,11 +717,14 @@ export async function recordMedicineAction(
   }
 
   // Generate Activity & Notification
+  const elderlyName = getElderlyNameSync(userId);
+
+  // Generate Activity & Notification
   if (action === 'TAKEN') {
     addCaregiverActivity({
       user_id: userId,
-      elderly_name: 'Lakshmi Devi',
-      message: `Lakshmi Devi took ${med.name} at ${timeFormatted}.`,
+      elderly_name: elderlyName,
+      message: `${elderlyName} took ${med.name} at ${timeFormatted}.`,
       type: 'medicine',
     });
     addNotification({
@@ -614,7 +737,7 @@ export async function recordMedicineAction(
     const nextTime = new Date(snoozedUntil!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     addCaregiverActivity({
       user_id: userId,
-      elderly_name: 'Lakshmi Devi',
+      elderly_name: elderlyName,
       message: `Snoozed ${med.name} reminder by ${snoozeMinutes} minutes (next reminder at ${nextTime}).`,
       type: 'medicine',
     });
@@ -627,8 +750,8 @@ export async function recordMedicineAction(
   } else if (action === 'MISSED') {
     addCaregiverActivity({
       user_id: userId,
-      elderly_name: 'Lakshmi Devi',
-      message: `ALERT: ${med.name} scheduled for ${med.scheduled_time} was marked as missed!`,
+      elderly_name: elderlyName,
+      message: `ALERT: ${med.name} scheduled for ${med.scheduled_time} was marked as missed by ${elderlyName}!`,
       type: 'medicine',
     });
     addNotification({
@@ -641,10 +764,11 @@ export async function recordMedicineAction(
     addNotification({
       user_id: DEMO_CAREGIVER_USER.id,
       title: 'ALERT: Medicine Missed',
-      message: `Lakshmi Devi missed scheduled dose of ${med.name} (${med.dosage}) scheduled for ${med.scheduled_time}.`,
+      message: `${elderlyName} missed scheduled dose of ${med.name} (${med.dosage}) scheduled for ${med.scheduled_time}.`,
       type: 'MEDICINE_MISSED',
     });
   }
+
 
   broadcastUpdate('MEDICINE_LOGGED', { medicine: med, log: newLog });
   return { medicine: med, log: newLog };
@@ -748,7 +872,7 @@ export async function addHealthReading(
 
   addCaregiverActivity({
     user_id: data.user_id,
-    elderly_name: 'Lakshmi Devi',
+    elderly_name: getElderlyNameSync(data.user_id),
     message: `New health reading recorded: ${paramLabel} at ${displayVal} (${data.status}).`,
     type: 'health',
   });
@@ -840,7 +964,7 @@ export async function addAppointment(
 
   addCaregiverActivity({
     user_id: newApt.user_id,
-    elderly_name: 'Lakshmi Devi',
+    elderly_name: getElderlyNameSync(newApt.user_id),
     message: `Doctor appointment scheduled with ${newApt.doctor_name} on ${newApt.appointment_date} at ${newApt.appointment_time}.`,
     type: 'appointment',
   });
@@ -1079,12 +1203,13 @@ export async function triggerEmergency(
   notes: string = 'Emergency SOS triggered from Home Command Center'
 ): Promise<EmergencyEvent> {
   ensureInitializedStore();
+  const elderlyName = getElderlyNameSync(userId);
   const newEvent: EmergencyEvent = {
     id: `eme-${Date.now()}`,
     user_id: userId,
-    elderly_name: 'Lakshmi Devi',
+    elderly_name: elderlyName,
     timestamp: new Date().toISOString(),
-    status: 'TRIGGERED',
+    status: 'ACTIVATED',
     notes,
     location,
     caregiver_notified: true,
@@ -1105,7 +1230,7 @@ export async function triggerEmergency(
   list.unshift(newEvent);
   localStorage.setItem(STORAGE_KEYS.EMERGENCY_EVENTS, JSON.stringify(list));
 
-  // Add high-priority notification
+  // Add high-priority notification for elderly user
   addNotification({
     user_id: userId,
     title: '🚨 EMERGENCY SOS INITIATED',
@@ -1113,11 +1238,19 @@ export async function triggerEmergency(
     type: 'EMERGENCY',
   });
 
+  // Explicit notification for linked caregiver
+  addNotification({
+    user_id: DEMO_CAREGIVER_USER.id,
+    title: '🚨 CRITICAL: SOS ALERT FROM ELDERLY USER',
+    message: `${elderlyName} triggered an emergency SOS from ${location}! Immediate attention required.`,
+    type: 'EMERGENCY',
+  });
+
   // Add Caregiver Activity
   addCaregiverActivity({
     user_id: userId,
-    elderly_name: 'Lakshmi Devi',
-    message: `🚨 EMERGENCY ALERT: Lakshmi Devi triggered SOS from ${location}!`,
+    elderly_name: elderlyName,
+    message: `🚨 EMERGENCY ALERT: ${elderlyName} triggered SOS from ${location}!`,
     type: 'emergency',
   });
 

@@ -26,16 +26,19 @@ import {
   deleteMedicine, 
   recordMedicineAction, 
   getMedicineLogs,
-  subscribeToLiveUpdates
+  subscribeToLiveUpdates,
+  isMedicineDueTime
 } from '@/services/api';
 import { soundEffects } from '@/utils/audio';
 import { Medicine, MedicineLog, MedicineStatus } from '@/types';
+import { SnoozeModal } from '@/components/medicines/SnoozeModal';
 
 export const MedicinesPage: React.FC = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState<boolean>(true);
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [logs, setLogs] = useState<MedicineLog[]>([]);
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
   
   // Filtering & Search
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -44,9 +47,20 @@ export const MedicinesPage: React.FC = () => {
   // Modals & Action states
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
   const [editingMedicine, setEditingMedicine] = useState<Medicine | null>(null);
+  const [snoozeModalOpen, setSnoozeModalOpen] = useState<boolean>(false);
+  const [snoozeTargetMed, setSnoozeTargetMed] = useState<Medicine | null>(null);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'prescriptions' | 'logs'>('prescriptions');
+
+  // Real-time time interval to detect due medicines without manual reload
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
+
 
   // Form State
   const [formData, setFormData] = useState({
@@ -179,8 +193,34 @@ export const MedicinesPage: React.FC = () => {
     }
   };
 
+  const handleOpenSnooze = (med: Medicine) => {
+    setSnoozeTargetMed(med);
+    setSnoozeModalOpen(true);
+  };
+
+  const handleConfirmSnooze = async (medicineId: string, minutes: number) => {
+    if (!user) return;
+    setActionInProgress(medicineId);
+    try {
+      await recordMedicineAction(medicineId, user.id, 'SNOOZED', undefined, minutes);
+      showToast(`Reminder snoozed for ${minutes} minutes.`);
+      await fetchData();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
   const handleAction = async (medicineId: string, action: 'TAKEN' | 'SNOOZED' | 'MISSED') => {
     if (!user) return;
+    if (action === 'SNOOZED') {
+      const med = medicines.find(m => m.id === medicineId);
+      if (med) {
+        handleOpenSnooze(med);
+        return;
+      }
+    }
     setActionInProgress(medicineId);
     try {
       await recordMedicineAction(medicineId, user.id, action);
@@ -192,8 +232,6 @@ export const MedicinesPage: React.FC = () => {
           colors: ['#22d3ee', '#3b82f6', '#22c55e']
         });
         showToast('Logged as TAKEN. Adherence score updated!');
-      } else if (action === 'SNOOZED') {
-        showToast('Snoozed for 15 minutes.');
       } else {
         showToast('Marked as MISSED. Escalation sent to caregiver.');
       }
@@ -204,6 +242,7 @@ export const MedicinesPage: React.FC = () => {
       setActionInProgress(null);
     }
   };
+
 
   // Filtered medicines
   const filteredMedicines = medicines.filter((m) => {
@@ -323,105 +362,122 @@ export const MedicinesPage: React.FC = () => {
             </div>
           ) : filteredMedicines.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {filteredMedicines.map((med) => (
-                <div
-                  key={med.id}
-                  className="bg-[#0B1220]/90 border border-white/[0.08] hover:border-white/[0.16] rounded-2xl p-5 shadow-lg flex flex-col justify-between transition-all group"
-                >
-                  <div>
-                    {/* Top Status & Edit/Delete */}
-                    <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${
-                        med.status === 'TAKEN'
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : med.status === 'DUE'
-                          ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse'
-                          : med.status === 'SNOOZED'
-                          ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
-                          : med.status === 'MISSED'
-                          ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                          : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                      }`}>
-                        {med.status}
-                      </span>
+              {filteredMedicines.map((med) => {
+                const isDue = isMedicineDueTime(med, currentTime);
+                return (
+                  <div
+                    key={med.id}
+                    className={`rounded-2xl p-5 shadow-lg flex flex-col justify-between transition-all group ${
+                      isDue
+                        ? 'medicine-due-card-alert'
+                        : 'bg-[#0B1220]/90 border border-white/[0.08] hover:border-white/[0.16]'
+                    }`}
+                  >
+                    <div>
+                      {/* Top Status & Edit/Delete */}
+                      <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                          isDue
+                            ? 'bg-red-500/25 text-red-300 border border-red-500/50 medicine-due-badge-blink'
+                            : med.status === 'TAKEN'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : med.status === 'SNOOZED'
+                            ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                            : med.status === 'MISSED'
+                            ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                            : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                        }`}>
+                          {isDue && <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-ping shrink-0" />}
+                          {isDue ? 'MEDICINE DUE' : med.status}
+                        </span>
 
-                      <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditModal(med)}
-                          className="p-1.5 text-slate-400 hover:text-cyan-300 hover:bg-slate-800 rounded-lg transition-colors"
-                          title="Edit Prescription"
-                        >
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          disabled={actionInProgress === med.id}
-                          onClick={() => handleDelete(med.id, med.name)}
-                          className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors"
-                          title="Delete Medicine"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Main Med Info */}
-                    <div className="mt-4">
-                      <h3 className="text-xl font-bold text-white tracking-tight">{med.name}</h3>
-                      <p className="text-xs text-cyan-300 font-semibold mt-0.5">
-                        {med.dosage} • {med.frequency}
-                      </p>
-
-                      <div className="mt-3 flex items-center gap-2 text-xs text-slate-300">
-                        <Clock className="w-3.5 h-3.5 text-cyan-400" />
-                        <span>Scheduled: <strong className="font-mono text-white">{med.scheduled_time}</strong></span>
+                        <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditModal(med)}
+                            className="p-1.5 text-slate-400 hover:text-cyan-300 hover:bg-slate-800 rounded-lg transition-colors"
+                            title="Edit Prescription"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={actionInProgress === med.id}
+                            onClick={() => handleDelete(med.id, med.name)}
+                            className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors"
+                            title="Delete Medicine"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
 
-                      {med.notes && (
-                        <p className="mt-2 text-xs text-slate-400 bg-slate-900/60 p-2.5 rounded-xl border border-white/[0.04] leading-relaxed">
-                          {med.notes}
+                      {/* Main Med Info */}
+                      <div className="mt-4">
+                        <h3 className="text-xl font-bold text-white tracking-tight">{med.name}</h3>
+                        <p className="text-xs text-cyan-300 font-semibold mt-0.5">
+                          {med.dosage} • {med.frequency}
                         </p>
-                      )}
+
+                        <div className={`mt-3 inline-flex items-center gap-2 px-2.5 py-1 rounded-lg text-xs ${
+                          isDue ? 'bg-red-950/60 text-red-200 border border-red-500/40' : 'bg-slate-900/60 text-slate-300'
+                        }`}>
+                          <Clock className={`w-3.5 h-3.5 ${isDue ? 'text-red-400 animate-pulse' : 'text-cyan-400'}`} />
+                          <span>Scheduled: <strong className="font-mono text-white">{med.scheduled_time}</strong></span>
+                        </div>
+
+                        {med.snoozed_until && med.status === 'SNOOZED' && (
+                          <div className="mt-1.5 text-[11px] text-amber-300 flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-amber-400" />
+                            <span>Snoozed until {new Date(med.snoozed_until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                        )}
+
+                        {med.notes && (
+                          <p className="mt-2 text-xs text-slate-400 bg-slate-900/60 p-2.5 rounded-xl border border-white/[0.04] leading-relaxed">
+                            {med.notes}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Operational Action Buttons */}
+                    <div className="mt-5 pt-4 border-t border-white/[0.06] flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={actionInProgress === med.id}
+                        onClick={() => handleAction(med.id, 'TAKEN')}
+                        className="flex-1 py-2 bg-emerald-600/30 hover:bg-emerald-600 border border-emerald-500/40 hover:border-transparent text-emerald-200 hover:text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-50"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Taken</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={actionInProgress === med.id}
+                        onClick={() => handleOpenSnooze(med)}
+                        className="px-3 py-2 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 text-amber-300 text-xs font-bold rounded-xl transition-all flex items-center gap-1 active:scale-95 disabled:opacity-50"
+                        title="Snooze Reminder"
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>Snooze</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={actionInProgress === med.id}
+                        onClick={() => handleAction(med.id, 'MISSED')}
+                        className="px-3 py-2 bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/30 text-rose-300 text-xs font-bold rounded-xl transition-all flex items-center gap-1 active:scale-95 disabled:opacity-50"
+                        title="Mark Missed"
+                      >
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        <span>Missed</span>
+                      </button>
                     </div>
                   </div>
-
-                  {/* Operational Action Buttons */}
-                  <div className="mt-5 pt-4 border-t border-white/[0.06] flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={actionInProgress === med.id}
-                      onClick={() => handleAction(med.id, 'TAKEN')}
-                      className="flex-1 py-2 bg-emerald-600/30 hover:bg-emerald-600 border border-emerald-500/40 hover:border-transparent text-emerald-200 hover:text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-50"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Taken</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={actionInProgress === med.id}
-                      onClick={() => handleAction(med.id, 'SNOOZED')}
-                      className="px-3 py-2 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 text-amber-300 text-xs font-bold rounded-xl transition-all flex items-center gap-1 active:scale-95 disabled:opacity-50"
-                      title="Snooze 15m"
-                    >
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>Snooze</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={actionInProgress === med.id}
-                      onClick={() => handleAction(med.id, 'MISSED')}
-                      className="px-3 py-2 bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/30 text-rose-300 text-xs font-bold rounded-xl transition-all flex items-center gap-1 active:scale-95 disabled:opacity-50"
-                      title="Mark Missed"
-                    >
-                      <AlertCircle className="w-3.5 h-3.5" />
-                      <span>Missed</span>
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="p-12 text-center bg-slate-950/40 border border-white/[0.06] rounded-3xl">
@@ -635,6 +691,15 @@ export const MedicinesPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Snooze Duration Selector Modal */}
+      <SnoozeModal
+        isOpen={snoozeModalOpen}
+        onClose={() => setSnoozeModalOpen(false)}
+        medicine={snoozeTargetMed}
+        onConfirm={handleConfirmSnooze}
+      />
     </div>
   );
 };
+

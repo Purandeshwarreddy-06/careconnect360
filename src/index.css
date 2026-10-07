@@ -109,3 +109,36 @@ body {
 .animate-pulse-live {
   animation: pulse-live 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* Medicine Due Urgency Red Alert */
+@keyframes medicine-due-border-pulse {
+  0%, 100% {
+    border-color: rgba(239, 68, 68, 0.4);
+    box-shadow: 0 0 15px -3px rgba(239, 68, 68, 0.35), inset 0 0 12px -4px rgba(239, 68, 68, 0.15);
+  }
+  50% {
+    border-color: rgba(239, 68, 68, 0.95);
+    box-shadow: 0 0 28px 4px rgba(239, 68, 68, 0.65), inset 0 0 20px -2px rgba(239, 68, 68, 0.3);
+  }
+}
+
+@keyframes medicine-due-badge-blink {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.92);
+  }
+}
+
+.medicine-due-card-alert {
+  animation: medicine-due-border-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
+  background: linear-gradient(135deg, rgba(38, 12, 22, 0.92), rgba(16, 24, 39, 0.96)) !important;
+}
+
+.medicine-due-badge-blink {
+  animation: medicine-due-badge-blink 1.4s ease-in-out infinite;
+}
+
