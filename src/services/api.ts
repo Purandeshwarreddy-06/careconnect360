@@ -120,17 +120,20 @@ export function ensureInitializedStore() {
       JSON.stringify(getInitialHealthReadings())
     );
   } else {
-    // If stored health readings do not yet have the 3 new parameters (height, bmi, respiratory_rate), populate them
+    // If stored health readings do not yet have recent demo data or all 9 parameters, ensure they are seeded
     try {
       const existingReadings: HealthReading[] = JSON.parse(
         localStorage.getItem(STORAGE_KEYS.HEALTH_READINGS) || '[]'
       );
-      const hasNewParams = existingReadings.some((r) => r.parameter === 'height' || r.parameter === 'bmi' || r.parameter === 'respiratory_rate');
-      if (!hasNewParams) {
-        const demoReadings = getInitialHealthReadings();
+      const now = Date.now();
+      const hasRecentDemoReadings = existingReadings.some(
+        (r) => r.is_demo && (now - new Date(r.timestamp).getTime()) <= 168 * 3600000
+      );
+      if (!hasRecentDemoReadings) {
+        const customReadings = existingReadings.filter((r) => !r.is_demo);
         localStorage.setItem(
           STORAGE_KEYS.HEALTH_READINGS,
-          JSON.stringify([...existingReadings, ...demoReadings.filter(r => ['height', 'bmi', 'respiratory_rate'].includes(r.parameter))])
+          JSON.stringify([...getInitialHealthReadings(), ...customReadings])
         );
       }
     } catch (e) {}
@@ -874,6 +877,8 @@ export async function getHealthReadings(
   filter?: '24H' | '7D' | '30D'
 ): Promise<HealthReading[]> {
   ensureInitializedStore();
+  const isDemo = !userId || userId === DEMO_PATIENT.id || userId === 'usr-elderly-01' || userId === 'usr-lakshmi-devi-01';
+
   if (isSupabaseConfigured()) {
     try {
       const { data, error } = await supabase
@@ -888,16 +893,31 @@ export async function getHealthReadings(
       console.warn('Supabase getHealthReadings fallback:', err);
     }
   }
+
   const list: HealthReading[] = JSON.parse(
     localStorage.getItem(STORAGE_KEYS.HEALTH_READINGS) || '[]'
   );
-  let userList = list.filter((r) => r.user_id === userId || !r.user_id);
-  if (userList.length === 0 && (userId === DEMO_PATIENT.id || !userId || userId === 'usr-elderly-01' || userId === 'usr-lakshmi-devi-01')) {
-    const demoReadings = getInitialHealthReadings(userId);
-    const otherReadings = list.filter((r) => r.user_id !== userId && !!r.user_id);
-    localStorage.setItem(STORAGE_KEYS.HEALTH_READINGS, JSON.stringify([...demoReadings, ...otherReadings]));
-    userList = demoReadings;
+  let userList = list.filter((r) => r.user_id === userId || !r.user_id || (isDemo && (!r.user_id || r.user_id === DEMO_PATIENT.id || r.user_id === 'usr-elderly-01' || r.user_id === 'usr-lakshmi-devi-01')));
+
+  const now = Date.now();
+  const hasUserCustomReadings = userList.some((r) => !r.is_demo);
+  const hasActive7DReadings = userList.some(
+    (r) => (now - new Date(r.timestamp).getTime()) <= 168 * 3600000 && (now - new Date(r.timestamp).getTime()) >= -3600000
+  );
+
+  if (isDemo && (!hasActive7DReadings || userList.length === 0)) {
+    const demoReadings = getInitialHealthReadings(userId || DEMO_PATIENT.id);
+    const customReadings = list.filter((r) => !r.is_demo);
+    localStorage.setItem(
+      STORAGE_KEYS.HEALTH_READINGS,
+      JSON.stringify([...demoReadings, ...customReadings])
+    );
+    userList = [...demoReadings, ...userList.filter((r) => !r.is_demo)];
   }
+
+  // Ensure chronologically sorted ascending so graphs render properly from past to present
+  userList.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
   return filterReadingsByTime(userList, filter);
 }
 
@@ -908,9 +928,10 @@ function filterReadingsByTime(
   if (!filter) return readings;
   const now = Date.now();
   const maxHours = filter === '24H' ? 24 : filter === '7D' ? 168 : 720;
-  return readings.filter(
-    (r) => (now - new Date(r.timestamp).getTime()) <= maxHours * 3600000
-  );
+  return readings.filter((r) => {
+    const diffHours = (now - new Date(r.timestamp).getTime()) / 3600000;
+    return diffHours >= -1 && diffHours <= maxHours;
+  });
 }
 
 export async function addHealthReading(

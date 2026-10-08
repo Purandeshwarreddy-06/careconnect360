@@ -196,8 +196,8 @@ export const HealthPage: React.FC = () => {
     time: new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     date: new Date(r.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' }),
     value: r.value,
-    systolic: r.systolic,
-    diastolic: r.diastolic,
+    systolic: r.systolic ?? (r.parameter === 'blood_pressure' ? r.value : undefined),
+    diastolic: r.diastolic ?? (r.parameter === 'blood_pressure' ? 80 : undefined),
     unit: r.unit,
     status: r.status,
   }));
@@ -233,7 +233,11 @@ export const HealthPage: React.FC = () => {
             Vital Readings & Trends
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-            Continuous health parameter tracking • Sample Data / Hackathon Demo • Not a clinical diagnosis
+            Continuous health parameter tracking • Sample Data / Hackathon Demo · Not a clinical diagnosis
+          </p>
+          <p className="text-xs text-amber-400/90 font-medium mt-1 inline-flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            <span>DEMO DATA — Not a medical record</span>
           </p>
         </div>
 
@@ -305,8 +309,8 @@ export const HealthPage: React.FC = () => {
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
                 Latest: <strong className="font-mono text-white text-sm">
-                  {latestReading?.systolic && latestReading?.diastolic
-                    ? `${latestReading.systolic}/${latestReading.diastolic} ${latestReading.unit}`
+                  {selectedParameter === 'blood_pressure' && latestReading
+                    ? `${latestReading.systolic || latestReading.value}/${latestReading.diastolic || 80} ${latestReading.unit}`
                     : latestReading ? `${latestReading.value} ${latestReading.unit}` : 'No readings yet'}
                 </strong>
               </p>
@@ -339,13 +343,17 @@ export const HealthPage: React.FC = () => {
               <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.4} />
+                    <stop offset="5%" stopColor="#38BDF8" stopOpacity={0.4} />
                     <stop offset="95%" stopColor="#06B6D4" stopOpacity={0.0} />
+                  </linearGradient>
+                  <linearGradient id="chartGradDia" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#818CF8" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#6366F1" stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
                 <XAxis 
-                  dataKey="date" 
+                  dataKey={timeFilter === '24H' ? 'time' : 'date'} 
                   stroke="#64748B" 
                   tick={{ fontSize: 11 }}
                   tickLine={false}
@@ -364,8 +372,15 @@ export const HealthPage: React.FC = () => {
                         <div className="bg-slate-950/95 border border-slate-800 p-3 rounded-xl shadow-xl text-xs space-y-1">
                           <p className="text-slate-400">{data.date} at {data.time}</p>
                           <p className="text-cyan-400 font-bold font-mono text-sm">
-                            {data.systolic && data.diastolic ? `${data.systolic}/${data.diastolic}` : data.value} {data.unit}
+                            {selectedParameter === 'blood_pressure'
+                              ? `BP: ${data.systolic || data.value}/${data.diastolic || 80} ${data.unit}`
+                              : `${data.value} ${data.unit}`}
                           </p>
+                          {selectedParameter === 'blood_pressure' && (
+                            <p className="text-[11px] text-slate-300">
+                              Systolic: <span className="text-cyan-300 font-semibold">{data.systolic || data.value}</span> · Diastolic: <span className="text-indigo-300 font-semibold">{data.diastolic || 80}</span>
+                            </p>
+                          )}
                           <p className="text-[11px]">
                             Status: <span className="font-semibold text-emerald-400">{data.status}</span>
                           </p>
@@ -375,14 +390,41 @@ export const HealthPage: React.FC = () => {
                     return null;
                   }}
                 />
-                <Area
-                  type="monotone"
-                  dataKey="value"
-                  stroke="#38BDF8"
-                  strokeWidth={3}
-                  fillOpacity={1}
-                  fill="url(#chartGrad)"
-                />
+                {selectedParameter === 'blood_pressure' ? (
+                  <>
+                    <Area
+                      type="monotone"
+                      dataKey="systolic"
+                      name="Systolic"
+                      stroke="#38BDF8"
+                      strokeWidth={3}
+                      fillOpacity={1}
+                      fill="url(#chartGrad)"
+                      dot={{ r: 4, fill: '#38BDF8', strokeWidth: 1, stroke: '#0B1220' }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="diastolic"
+                      name="Diastolic"
+                      stroke="#818CF8"
+                      strokeWidth={2}
+                      strokeDasharray="4 4"
+                      fillOpacity={1}
+                      fill="url(#chartGradDia)"
+                      dot={{ r: 3, fill: '#818CF8', strokeWidth: 1, stroke: '#0B1220' }}
+                    />
+                  </>
+                ) : (
+                  <Area
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#38BDF8"
+                    strokeWidth={3}
+                    fillOpacity={1}
+                    fill="url(#chartGrad)"
+                    dot={{ r: 4, fill: '#38BDF8', strokeWidth: 1, stroke: '#0B1220' }}
+                  />
+                )}
               </AreaChart>
             </ResponsiveContainer>
           ) : (
@@ -391,6 +433,18 @@ export const HealthPage: React.FC = () => {
             </div>
           )}
         </div>
+        {selectedParameter === 'blood_pressure' && chartData.length > 0 && (
+          <div className="flex items-center justify-end gap-5 text-xs text-slate-400 mt-3 pt-3 border-t border-white/[0.04]">
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-1 bg-[#38BDF8] rounded-full inline-block" />
+              <span>Systolic (mmHg)</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-1 bg-[#818CF8] rounded-full inline-block border-b border-dashed" />
+              <span>Diastolic (mmHg)</span>
+            </span>
+          </div>
+        )}
       </section>
 
       {/* RECENT READINGS TABLE */}

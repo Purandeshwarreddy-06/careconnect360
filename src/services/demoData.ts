@@ -121,12 +121,20 @@ export const getInitialMedicines = (userId: string = DEMO_PATIENT.id): Medicine[
   },
 ];
 
-// Default Demo Health Parameters
-// Blood Pressure: 120/80 mmHg | Heart Rate: 72 bpm | SpO2: 98% | Temperature: 36.8 °C
-// Blood Glucose: 95 mg/dL | Weight: 68 kg | Height: 170 cm | BMI: 23.5 | Resp Rate: 16/min
+// Default Demo Health Parameters - Exactly 7 days of historical readings (Oct 1 - Oct 7)
 export const getInitialHealthReadings = (userId: string = DEMO_PATIENT.id): HealthReading[] => {
   const readings: HealthReading[] = [];
   const now = Date.now();
+
+  // 7 days of timestamps ending at current time (hours ago relative to now):
+  // Day 1 (Oct 1): 144h ago (6 days)
+  // Day 2 (Oct 2): 120h ago (5 days)
+  // Day 3 (Oct 3): 96h ago (4 days)
+  // Day 4 (Oct 4): 72h ago (3 days)
+  // Day 5 (Oct 5): 48h ago (2 days)
+  // Day 6 (Oct 6): 20h ago (~1 day / yesterday - falls inside 24H)
+  // Day 7 (Oct 7): 2h ago (~today / latest - falls inside 24H)
+  const hoursAgoList = [144, 120, 96, 72, 48, 20, 2];
 
   const add = (
     parameter: HealthReading['parameter'],
@@ -136,10 +144,11 @@ export const getInitialHealthReadings = (userId: string = DEMO_PATIENT.id): Heal
     hoursAgo: number,
     note?: string,
     systolic?: number,
-    diastolic?: number
+    diastolic?: number,
+    index?: number
   ) => {
     readings.push({
-      id: `hr-${parameter}-${Math.round(hoursAgo * 100)}`,
+      id: `hr-${parameter}-${index !== undefined ? index : Math.round(hoursAgo * 10)}`,
       user_id: userId,
       parameter,
       value,
@@ -147,72 +156,81 @@ export const getInitialHealthReadings = (userId: string = DEMO_PATIENT.id): Heal
       diastolic,
       unit,
       status,
-      note: note || 'Demo Data — Sample health reading',
+      note: note || 'DEMO DATA — Not a medical record',
       is_demo: true,
       timestamp: new Date(now - hoursAgo * 3600000).toISOString(),
       created_at: new Date(now - hoursAgo * 3600000).toISOString(),
     });
   };
 
-  // 1. Blood Pressure: 120/80 mmHg
-  add('blood_pressure', 120, 'mmHg', 'NORMAL', 1, 'Demo Data — Resting baseline reading', 120, 80);
-  add('blood_pressure', 118, 'mmHg', 'NORMAL', 14, 'Demo Data — Evening resting check', 118, 78);
-  add('blood_pressure', 122, 'mmHg', 'NORMAL', 26, 'Demo Data — Midday check', 122, 82);
-  add('blood_pressure', 120, 'mmHg', 'NORMAL', 50, 'Demo Data — Normal baseline measurement', 120, 80);
-  add('blood_pressure', 119, 'mmHg', 'NORMAL', 98, 'Demo Data — Optimal blood pressure', 119, 79);
-  add('blood_pressure', 121, 'mmHg', 'NORMAL', 170, 'Demo Data — Weekly routine check', 121, 80);
-  add('blood_pressure', 120, 'mmHg', 'NORMAL', 360, 'Demo Data — Monthly benchmark reading', 120, 80);
+  // 1. BLOOD PRESSURE:
+  // Oct 1: 118/78, Oct 2: 120/80, Oct 3: 119/79, Oct 4: 121/81, Oct 5: 120/80, Oct 6: 122/80, Oct 7: 120/80
+  const bpData = [
+    { sys: 118, dia: 78 },
+    { sys: 120, dia: 80 },
+    { sys: 119, dia: 79 },
+    { sys: 121, dia: 81 },
+    { sys: 120, dia: 80 },
+    { sys: 122, dia: 80 },
+    { sys: 120, dia: 80 },
+  ];
+  bpData.forEach((item, idx) => {
+    add('blood_pressure', item.sys, 'mmHg', 'NORMAL', hoursAgoList[idx], 'DEMO DATA — Not a medical record', item.sys, item.dia, idx + 1);
+  });
 
-  // 2. Heart Rate: 72 bpm
-  add('heart_rate', 72, 'bpm', 'NORMAL', 1, 'Demo Data — Resting pulse normal');
-  add('heart_rate', 74, 'bpm', 'NORMAL', 6, 'Demo Data — Midday observation');
-  add('heart_rate', 70, 'bpm', 'NORMAL', 14, 'Demo Data — Resting morning pulse');
-  add('heart_rate', 72, 'bpm', 'NORMAL', 24, 'Demo Data — Recorded baseline');
-  add('heart_rate', 75, 'bpm', 'NORMAL', 48, 'Demo Data — Mild activity check');
-  add('heart_rate', 72, 'bpm', 'NORMAL', 168, 'Demo Data — Weekly check');
-  add('heart_rate', 71, 'bpm', 'NORMAL', 350, 'Demo Data — Monthly average');
+  // 2. HEART RATE:
+  // Oct 1: 70 bpm, Oct 2: 72 bpm, Oct 3: 71 bpm, Oct 4: 73 bpm, Oct 5: 72 bpm, Oct 6: 74 bpm, Oct 7: 72 bpm
+  const hrData = [70, 72, 71, 73, 72, 74, 72];
+  hrData.forEach((val, idx) => {
+    add('heart_rate', val, 'bpm', 'NORMAL', hoursAgoList[idx], 'DEMO DATA — Not a medical record', undefined, undefined, idx + 1);
+  });
 
-  // 3. SpO2: 98%
-  add('spo2', 98, '%', 'NORMAL', 1.5, 'Demo Data — Room air oxygen saturation');
-  add('spo2', 97, '%', 'NORMAL', 8, 'Demo Data — Afternoon pulse oximetry');
-  add('spo2', 99, '%', 'NORMAL', 24, 'Demo Data — Deep breathing exercise');
-  add('spo2', 98, '%', 'NORMAL', 72, 'Demo Data — Normal oxygenation');
-  add('spo2', 98, '%', 'NORMAL', 168, 'Demo Data — Consistent stable oxygen level');
+  // 3. SPO2:
+  // Oct 1: 97%, Oct 2: 98%, Oct 3: 98%, Oct 4: 97%, Oct 5: 98%, Oct 6: 99%, Oct 7: 98%
+  const spo2Data = [97, 98, 98, 97, 98, 99, 98];
+  spo2Data.forEach((val, idx) => {
+    add('spo2', val, '%', 'NORMAL', hoursAgoList[idx], 'DEMO DATA — Not a medical record', undefined, undefined, idx + 1);
+  });
 
-  // 4. Temperature: 36.8 °C
-  add('temperature', 36.8, '°C', 'NORMAL', 2, 'Demo Data — Normal body temperature');
-  add('temperature', 36.7, '°C', 'NORMAL', 12, 'Demo Data — Morning oral check');
-  add('temperature', 36.8, '°C', 'NORMAL', 36, 'Demo Data — Routine check');
-  add('temperature', 36.9, '°C', 'NORMAL', 90, 'Demo Data — Midday baseline');
-  add('temperature', 36.8, '°C', 'NORMAL', 168, 'Demo Data — Weekly recorded reading');
+  // 4. TEMPERATURE:
+  // Oct 1: 36.7 °C, Oct 2: 36.8 °C, Oct 3: 36.6 °C, Oct 4: 36.9 °C, Oct 5: 36.7 °C, Oct 6: 36.8 °C, Oct 7: 36.8 °C
+  const tempData = [36.7, 36.8, 36.6, 36.9, 36.7, 36.8, 36.8];
+  tempData.forEach((val, idx) => {
+    add('temperature', val, '°C', 'NORMAL', hoursAgoList[idx], 'DEMO DATA — Not a medical record', undefined, undefined, idx + 1);
+  });
 
-  // 5. Blood Glucose: 95 mg/dL
-  add('blood_sugar', 95, 'mg/dL', 'NORMAL', 2.5, 'Demo Data — Fasting blood glucose optimal');
-  add('blood_sugar', 92, 'mg/dL', 'NORMAL', 14, 'Demo Data — Pre-meal check');
-  add('blood_sugar', 98, 'mg/dL', 'NORMAL', 28, 'Demo Data — Post-meal glucose observation');
-  add('blood_sugar', 94, 'mg/dL', 'NORMAL', 72, 'Demo Data — Morning fasting check');
-  add('blood_sugar', 95, 'mg/dL', 'NORMAL', 168, 'Demo Data — Stable glycemic control');
+  // 5. BLOOD SUGAR:
+  // Oct 1: 92 mg/dL, Oct 2: 95 mg/dL, Oct 3: 94 mg/dL, Oct 4: 97 mg/dL, Oct 5: 93 mg/dL, Oct 6: 96 mg/dL, Oct 7: 95 mg/dL
+  const sugarData = [92, 95, 94, 97, 93, 96, 95];
+  sugarData.forEach((val, idx) => {
+    add('blood_sugar', val, 'mg/dL', 'NORMAL', hoursAgoList[idx], 'DEMO DATA — Not a medical record', undefined, undefined, idx + 1);
+  });
 
-  // 6. Weight: 68 kg
-  add('weight', 68, 'kg', 'NORMAL', 3, 'Demo Data — Morning weigh-in');
-  add('weight', 68.1, 'kg', 'NORMAL', 48, 'Demo Data — Consistent body mass');
-  add('weight', 68.0, 'kg', 'NORMAL', 120, 'Demo Data — Stable weight trend');
-  add('weight', 68.2, 'kg', 'NORMAL', 240, 'Demo Data — Weekly maintenance weight');
+  // 6. WEIGHT:
+  // Oct 1: 67.5 kg, Oct 2: 67.6 kg, Oct 3: 67.7 kg, Oct 4: 67.8 kg, Oct 5: 67.9 kg, Oct 6: 68.0 kg, Oct 7: 68.0 kg
+  const weightData = [67.5, 67.6, 67.7, 67.8, 67.9, 68.0, 68.0];
+  weightData.forEach((val, idx) => {
+    add('weight', val, 'kg', 'NORMAL', hoursAgoList[idx], 'DEMO DATA — Not a medical record', undefined, undefined, idx + 1);
+  });
 
-  // 7. Height: 170 cm
-  add('height', 170, 'cm', 'NORMAL', 4, 'Demo Data — Measured adult height');
-  add('height', 170, 'cm', 'NORMAL', 720, 'Demo Data — Standing stadiometer record');
+  // 7. RESPIRATORY RATE:
+  // Oct 1: 16/min, Oct 2: 16/min, Oct 3: 17/min, Oct 4: 16/min, Oct 5: 16/min, Oct 6: 15/min, Oct 7: 16/min
+  const respData = [16, 16, 17, 16, 16, 15, 16];
+  respData.forEach((val, idx) => {
+    add('respiratory_rate', val, '/min', 'NORMAL', hoursAgoList[idx], 'DEMO DATA — Not a medical record', undefined, undefined, idx + 1);
+  });
 
-  // 8. BMI: 23.5 kg/m²
-  add('bmi', 23.5, 'kg/m²', 'NORMAL', 4, 'Demo Data — Healthy adult BMI range (18.5 - 24.9)');
-  add('bmi', 23.5, 'kg/m²', 'NORMAL', 720, 'Demo Data — Stable healthy body mass index');
+  // 8. HEIGHT: 170 cm
+  const heightData = [170, 170, 170, 170, 170, 170, 170];
+  heightData.forEach((val, idx) => {
+    add('height', val, 'cm', 'NORMAL', hoursAgoList[idx], 'DEMO DATA — Not a medical record', undefined, undefined, idx + 1);
+  });
 
-  // 9. Respiratory Rate: 16/min
-  add('respiratory_rate', 16, '/min', 'NORMAL', 2, 'Demo Data — Normal resting respiration');
-  add('respiratory_rate', 15, '/min', 'NORMAL', 14, 'Demo Data — Calm resting breathing');
-  add('respiratory_rate', 16, '/min', 'NORMAL', 36, 'Demo Data — Normal eupnea rate');
-  add('respiratory_rate', 17, '/min', 'NORMAL', 96, 'Demo Data — Baseline respiratory check');
-  add('respiratory_rate', 16, '/min', 'NORMAL', 168, 'Demo Data — Consistent respiratory rhythm');
+  // 9. BMI: 23.5 kg/m²
+  const bmiData = [23.5, 23.5, 23.5, 23.5, 23.5, 23.5, 23.5];
+  bmiData.forEach((val, idx) => {
+    add('bmi', val, 'kg/m²', 'NORMAL', hoursAgoList[idx], 'DEMO DATA — Not a medical record', undefined, undefined, idx + 1);
+  });
 
   return readings;
 };
@@ -375,7 +393,7 @@ export const getInitialEmergencyEvents = (userId: string = DEMO_PATIENT.id): Eme
   }
 ];
 
-export const getInitialCaregiverRelationships = (): CaregiverRelationship[] => [
+export const getInitialCaregiverRelationships = (_userId?: string): CaregiverRelationship[] => [
   {
     id: 'cgr-01',
     elderly_id: DEMO_PATIENT.id,
@@ -387,7 +405,7 @@ export const getInitialCaregiverRelationships = (): CaregiverRelationship[] => [
   }
 ];
 
-export const getInitialCaregiverActivity = (): CaregiverActivity[] => [
+export const getInitialCaregiverActivity = (_userId?: string): CaregiverActivity[] => [
   {
     id: 'act-01',
     user_id: DEMO_PATIENT.id,
